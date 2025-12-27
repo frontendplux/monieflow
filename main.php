@@ -32,19 +32,6 @@ html, body {
     height: 100%;
 }
 
-/* LEFT SIDE */
-.left {
-    flex: 1;
-    background:
-        linear-gradient(rgba(0,0,0,.75), rgba(110,15,15,.6)),
-        url("1.jpg") center/cover no-repeat;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 60px 30px;
-    color: white;
-}
-
 .brand {
     max-width: 560px;
     animation: fadeUp 1.2s ease;
@@ -81,18 +68,20 @@ html, body {
 
 /* RIGHT SIDE */
 .right {
-    flex: 1;
-    background: #0f0f0f;
+    background:
+        linear-gradient(rgba(0,0,0,.75), rgba(110,15,15,.6)),
+        url("1.jpg") center/cover no-repeat;
     display: flex;
     align-items: center;
     justify-content: center;
+    flex: 1;
 }
 
 .login-box {
     width: 100%;
     max-width: 480px;
-    background: #161616;
-    padding: 35px;
+    background: #161616df;
+    padding:20px 15px;
     border-radius: 18px;
     box-shadow: 0 15px 40px rgba(0,0,0,.6);
     animation: fadeUp 1.3s ease;
@@ -148,22 +137,6 @@ html, body {
     text-decoration: none;
 }
 
-/* MOBILE */
-@media (max-width: 768px) {
-    .container {
-        flex-direction: column;
-    }
-
-    .right {
-        display: none;
-    }
-
-    .left {
-        align-items: flex-end;
-        justify-content: center;
-        text-align: center;
-    }
-}
 
 /* Animation */
 @keyframes fadeUp {
@@ -174,18 +147,9 @@ html, body {
 </head>
 
 <body>
-<div class="container-fluid d-flex h-100 p-0">
+<div class="container-fluid  d-flex h-100 p-0">
 
-    <div class="left">
-        <div class="brand">
-            <h1 style="font-family:cursive;">MonieFlow</h1>
-            <p>Make unlimited transactions seamlessly and securely through MonieFlow.</p>
-            <a href="/main.php" class="d-sm-none cta">Get Started</a> 
-            <a href="/signup.php" class="d-sm-inline d-none cta">Get Started</a> 
-        </div>
-    </div>
-
-    <div class="right">
+    <div class="right p-2">
         <div class="login-box">
             <h2>Welcome Back</h2>
             <input type="email" id="username" placeholder="Email address">

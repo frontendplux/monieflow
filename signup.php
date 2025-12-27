@@ -1,115 +1,208 @@
-<?php include __DIR__."/compo/header.php"; ?>
-<body class="theme-light">
+<!DOCTYPE html>
+<?php
+include __DIR__."/config/function.php";
+$main = new Main($conn);
 
-<div id="preloader"><div class="spinner-border color-highlight" role="status"></div></div>
+if ($main->isLoggedIn()) {
+    header("Location: /home.php");
+    exit;
+}
+?>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-<!-- Page Wrapper-->
-<div id="page">
+<title>MonieFlow – Create Account</title>
 
-    <!-- Page Content - Only Page Elements Here-->
-    <div class="page-content my-0 py-0">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
 
-        <div class="card bg-5 card-fixed">
-            <div class="card-center mx-3 px-4 py-4 bg-white rounded-m">
-                <h1 class="font-30 font-800 mb-0"><?= company ?></h1>
-                <p>Create an account</p>
-                <div class="form-custom form-label form-border form-icon mb-3 bg-transparent">
-                    <i class="bi bi-person-circle font-13"></i>
-                    <input type="text" class="form-control rounded-xs" id="c1a" placeholder="Username"/>
-                    <label for="c1a" class="color-theme">Username</label>
-                    <span>(required)</span>
-                </div>
-                <div class="form-custom form-label form-border form-icon mb-3 bg-transparent">
-                    <i class="bi bi-at font-16"></i>
-                    <input type="email" class="form-control rounded-xs" id="c1" placeholder="Email Address"/>
-                    <label for="c1" class="color-theme">Email Address</label>
-                    <span>(required)</span>
-                </div>
-                <div class="form-custom form-label form-border form-icon mb-3 bg-transparent">
-                    <i class="bi bi-asterisk font-13"></i>
-                    <input type="password" class="form-control rounded-xs" id="c2" placeholder="Choose Password"/>
-                    <label for="c2" class="color-theme">Choose Password</label>
-                    <span>(required)</span>
-                </div>
-                <div class="form-custom form-label form-border form-icon mb-4 bg-transparent">
-                    <i class="bi bi-asterisk font-13"></i>
-                    <input type="password" class="form-control rounded-xs" id="c3" placeholder="Confirm Password"/>
-                    <label for="c3" class="color-theme">Choose Password</label>
-                    <span>(required)</span>
-                </div>
-                <div class="form-check form-check-custom">
-                    <input class="form-check-input" type="checkbox" name="type" value="" id="c2a">
-                    <label class="form-check-label font-12" for="c2a">I agree with the <a href="#">Terms and Conditions</a>.</label>
-                    <i class="is-checked color-highlight font-13 bi bi-check-circle-fill"></i>
-                    <i class="is-unchecked color-highlight font-13 bi bi-circle"></i>
-                </div>
-                <button onclick="signup(this)" type="button" id="signupBtn" class="btn btn-full w-100 gradient-highlight shadow-bg shadow-bg-s mt-4"> Create Account </button>
-                <!-- <a href="index.html" class="btn btn-full gradient-highlight shadow-bg shadow-bg-s mt-4">Create Account</a> -->
-                <div class="row">
-                    <div class="col-6 text-start">
-                        <a href="/forget.php" class="font-11 color-theme opacity-40 pt-4 d-block">Forgot Password?</a>
-                    </div>
-                    <div class="col-6 text-end">
-                        <a href="/index.php" class="font-11 color-theme opacity-40 pt-4 d-block">Sign In Account</a>
-                    </div>
-                </div>
-            </div>
-            <div class="card-overlay rounded-0 m-0 bg-black opacity-70"></div>
+<style>
+*{
+    margin:0;
+    padding:0;
+    box-sizing:border-box;
+    font-family:"Segoe UI",Arial,sans-serif;
+}
+
+html,body{
+    height:100%;
+}
+
+body{
+    background:
+        linear-gradient(rgba(0,0,0,.75),rgba(110,15,15,.6)),
+        url("1.jpg") center/cover no-repeat;
+}
+
+/* Center Box */
+.wrapper{
+    height:100%;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:15px;
+}
+
+.login-box{
+    width:100%;
+    max-width:480px;
+    background:rgba(22,22,22,.92);
+    padding:30px 25px;
+    border-radius:18px;
+    box-shadow:0 15px 40px rgba(0,0,0,.6);
+    animation:fadeUp 1s ease;
+}
+
+.login-box h2{
+    text-align:center;
+    color:#fff;
+    margin-bottom:20px;
+}
+
+.login-box input{
+    width:100%;
+    padding:14px;
+    border-radius:10px;
+    border:none;
+    background:#222;
+    color:#fff;
+    margin-bottom:15px;
+    outline:none;
+}
+
+.login-box input::placeholder{
+    color:#aaa;
+}
+
+.login-box button{
+    width:100%;
+    padding:14px;
+    border-radius:30px;
+    border:none;
+    background:linear-gradient(135deg,#ff4d4d,#b30000);
+    color:#fff;
+    font-weight:600;
+    cursor:pointer;
+    transition:.3s;
+}
+
+.login-box button:hover{
+    transform:translateY(-2px);
+    box-shadow:0 8px 20px rgba(255,77,77,.45);
+}
+
+.login-box .small{
+    margin-top:15px;
+    text-align:center;
+    font-size:.85rem;
+    color:#bbb;
+}
+
+.login-box a{
+    color:#ff4d4d;
+    text-decoration:none;
+}
+
+/* Animation */
+@keyframes fadeUp{
+    from{opacity:0;transform:translateY(25px);}
+    to{opacity:1;transform:translateY(0);}
+}
+</style>
+</head>
+
+<body>
+
+<div class="wrapper">
+    <div class="login-box">
+
+        <h2>Create Account</h2>
+
+        <input type="text" id="username" placeholder="Username">
+        <input type="email" id="email" placeholder="Email address">
+        <input type="password" id="password" placeholder="Password">
+        <input type="password" id="confirmPassword" placeholder="Confirm Password">
+
+        <div class="form-check text-white mb-3">
+            <input class="form-check-input me-1" style="width:max-content; height: max-content; padding: 8px;" type="checkbox" id="agree">
+            <label class="form-check-label" for="agree">
+                I agree to the <a href="#">Terms & Conditions</a>
+            </label>
         </div>
+
+        <button onclick="signup()">Create Account</button>
+
+        <div class="small mt-3 fs-5 d-flex justify-content-center gap-4">
+            <a href="#">Forgot Password?</a> ·
+            <a href="/main.php">Log in</a>
+        </div>
+
     </div>
 </div>
 
-<?php include __DIR__."/compo/footer.php"; ?>
+<script src="/script.js"></script>
 
 <script>
-function signup(e) {
-    showLoading();
-    const username = document.getElementById('c1a').value.trim();
-    const email    = document.getElementById('c1').value.trim();
-    const password = document.getElementById('c2').value.trim();
-    const confirm  = document.getElementById('c3').value.trim();
-    const agree    = document.getElementById('c2a').checked;
+function signup(){
+    showLoading?.();
 
-    // Validation
-    if (!username || !email || !password || !confirm) {
-        alert("All fields are required!");
-        hideLoading();
-        return;
-    }
-    if (password !== confirm) {
-        alert("Passwords do not match!");
-        hideLoading();
-        return;
-    }
-    if (!agree) {
-        alert("You must agree to the Terms and Conditions.");
-        hideLoading();
+    const username = document.getElementById("username").value.trim();
+    const email    = document.getElementById("email").value.trim();
+    const password = document.getElementById("password").value.trim();
+    const confirm  = document.getElementById("confirmPassword").value.trim();
+    const agree    = document.getElementById("agree").checked;
+
+    if(!username || !email || !password || !confirm){
+        alert("All fields are required");
+        hideLoading?.();
         return;
     }
 
-    // Build FormData
+    if(password.length < 6){
+        alert("Password must be at least 6 characters");
+        hideLoading?.();
+        return;
+    }
+
+    if(password !== confirm){
+        alert("Passwords do not match");
+        hideLoading?.();
+        return;
+    }
+
+    if(!agree){
+        alert("You must agree to the Terms & Conditions");
+        hideLoading?.();
+        return;
+    }
+
     const fd = new FormData();
-    fd.append("username", username);
-    fd.append("email", email);
-    fd.append("password", password);
-    fd.append("action", "signup");
+    fd.append("username",username);
+    fd.append("email",email);
+    fd.append("password",password);
+    fd.append("action","signup");
 
-    // Send POST request
-    fetch("/req.php", {
-        method: "POST",
-        body: fd
+    fetch("/req.php",{
+        method:"POST",
+        body:fd
     })
-    .then(res => res.json())
-    .then(data => {
-        if (data.success) {
-            window.location.href = "/confirm-pass.php"; // redirect to login
-        } else {
+    .then(res=>res.json())
+    .then(data=>{
+        if(data.success){
+            window.location.href="/confirm-pass.php";
+        }else{
             alert(data.message || "Signup failed");
         }
     })
-    .catch(err => console.error("Error:", err))
-    .finally(() => hideLoading());
+    .catch(()=>{
+        alert("Network error. Try again.");
+    })
+    .finally(()=>{
+        hideLoading?.();
+    });
 }
 </script>
 
 </body>
+</html>
