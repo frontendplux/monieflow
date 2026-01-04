@@ -2,132 +2,129 @@
 <?php
 include __DIR__."/config/function.php";
 $main = new Main($conn);
+
 if ($main->isLoggedIn()) {
     header("Location: /home.php");
     exit;
 }
-include __DIR__."/headers/header.php";
 ?>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>MonieFlow – Create Account</title>
+
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+
 <style>
-
-
-.brand {
-    max-width: 560px;
-    animation: fadeUp 1.2s ease;
+*{
+    margin:0;
+    padding:0;
+    box-sizing:border-box;
+    font-family:"Segoe UI",Arial,sans-serif;
 }
 
-.brand h1 {
-    font-size: 2.8rem;
-    margin-bottom: 12px;
+html,body{
+    height:100%;
 }
 
-.brand p {
-    font-size: 1rem;
-    line-height: 1.6;
-    color: #eee;
-    margin-bottom: 25px;
+body{
+    background:
+        linear-gradient(rgba(0,0,0,.75),rgba(110,15,15,.6)),
+        url("1.jpg") center/cover no-repeat;
 }
 
-/* CTA BUTTON */
-.brand .cta {
-    display: inline-block;
-    padding: 13px 38px;
-    background: linear-gradient(135deg, #ff4d4d, #b30000);
-    color: white;
-    text-decoration: none;
-    border-radius: 30px;
-    font-weight: 600;
-    transition: .3s;
+/* Center Box */
+.wrapper{
+    height:100%;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:15px;
 }
 
-.brand .cta:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 8px 20px rgba(255,77,77,.45);
+.login-box{
+    width:100%;
+    max-width:480px;
+    background:rgba(22,22,22,.92);
+    padding:30px 25px;
+    border-radius:18px;
+    box-shadow:0 15px 40px rgba(0,0,0,.6);
+    animation:fadeUp 1s ease;
 }
 
-/* RIGHT SIDE */
-.right {
-    /* background:
-        linear-gradient(rgba(0,0,0,.75), rgba(110,15,15,.6)),
-        url("1.jpg") center/cover no-repeat; */
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex: 1;
-    padding: 10px 20px;
+.login-box h2{
+    text-align:center;
+    color:#fff;
+    margin-bottom:20px;
 }
 
-.login-box {
-    width: 100%;
-    max-width: 580px;
-    background: white;
-    padding:20px 15px;
-    border-radius: 18px;
+.login-box input{
+    width:100%;
+    padding:14px;
+    border-radius:10px;
+    border:none;
+    background:#222;
+    color:#fff;
+    margin-bottom:15px;
+    outline:none;
 }
 
-.login-box h2 {
-    color: white;
-    margin-bottom: 22px;
-    text-align: center;
+.login-box input::placeholder{
+    color:#aaa;
 }
 
-.login-box input {
-    width: 100%;
-    padding: 14px;
-    margin-bottom: 15px;
-    border-radius: 10px;
-    border: none;
-    background: whitesmoke;
-    color: black;
-    outline: none;
+.login-box button{
+    width:100%;
+    padding:14px;
+    border-radius:30px;
+    border:none;
+    background:linear-gradient(135deg,#ff4d4d,#b30000);
+    color:#fff;
+    font-weight:600;
+    cursor:pointer;
+    transition:.3s;
 }
 
-.login-box input::placeholder {
-    color: black;
+.login-box button:hover{
+    transform:translateY(-2px);
+    box-shadow:0 8px 20px rgba(255,77,77,.45);
 }
 
-.login-box button {
-    width: 100%;
-    padding: 14px;
-    border-radius: 30px;
-    border: none;
-    background: linear-gradient(135deg, #ff4d4d, #b30000);
-    color: white;
-    font-weight: 600;
-    cursor: pointer;
-    transition: .3s;
+.login-box .small{
+    margin-top:15px;
+    text-align:center;
+    font-size:.85rem;
+    color:#bbb;
 }
 
-.login-box button:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 8px 20px rgba(255,77,77,.45);
+.login-box a{
+    color:#ff4d4d;
+    text-decoration:none;
 }
 
-.login-box .small {
-    margin-top: 15px;
-    text-align: center;
-    font-size: .85rem;
-    color: #bbb;
-}
-
-.login-box .small a {
-    color: #ff4d4d;
-    text-decoration: none;
+/* Animation */
+@keyframes fadeUp{
+    from{opacity:0;transform:translateY(25px);}
+    to{opacity:1;transform:translateY(0);}
 }
 </style>
-<div class="wrapper px-3">
-    <div class="login-box mx-auto my-3">
+</head>
 
-        <h2 class="text-dark">Create Account</h2>
+<body>
 
-        <div class="d-flex gap-2">
-            <input type="text" id="username" placeholder="Username">
-            <input type="email" id="email" placeholder="Email address">
-        </div>
+<div class="wrapper">
+    <div class="login-box">
+
+        <h2>Create Account</h2>
+
+        <input type="text" id="username" placeholder="Username">
+        <input type="email" id="email" placeholder="Email address">
         <input type="password" id="password" placeholder="Password">
         <input type="password" id="confirmPassword" placeholder="Confirm Password">
 
-        <div class="form-check  text-dark text-center mb-3">
+        <div class="form-check text-white mb-3">
             <input class="form-check-input me-1" style="width:max-content; height: max-content; padding: 8px;" type="checkbox" id="agree">
             <label class="form-check-label" for="agree">
                 I agree to the <a href="#">Terms & Conditions</a>
@@ -138,7 +135,7 @@ include __DIR__."/headers/header.php";
 
         <div class="small mt-3 fs-5 d-flex justify-content-center gap-4">
             <a href="#">Forgot Password?</a> ·
-            <a href="/login.php">Log in</a>
+            <a href="/main.php">Log in</a>
         </div>
 
     </div>

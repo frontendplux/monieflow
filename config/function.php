@@ -36,6 +36,7 @@
             $this->conn = $conn;
         }
 
+
         public function login($data) {
         // Validate inputs
             $user = mysqli_real_escape_string($this->conn, trim($data[0] ?? ""));
@@ -498,6 +499,43 @@ public function redeemCard($code) {
     ];
 }
 
+
+    // Fetch feeds with comments
+    public function feeds() {
+        $sql = "
+            SELECT f.id AS feed_id, f.title, f.content, f.created_at,
+                   c.id AS comment_id, c.text AS comment_text
+            FROM feeds f
+            LEFT JOIN comment c ON f.id = c.feed_id
+            ORDER BY f.id, c.id
+        ";
+        $smt = $this->conn->prepare($sql);
+        $smt->execute();
+        $res = $smt->get_result();
+        $rows = $res->fetch_all(MYSQLI_ASSOC);
+
+        // Group comments under feeds
+        $feeds = [];
+        foreach ($rows as $row) {
+            $fid = $row['feed_id'];
+            if (!isset($feeds[$fid])) {
+                $feeds[$fid] = [
+                    'id' => $fid,
+                    'title' => $row['title'],
+                    'content' => $row['content'],
+                    'created_at' => $row['created_at'],
+                    'comments' => []
+                ];
+            }
+            if (!empty($row['comment_id'])) {
+                $feeds[$fid]['comments'][] = [
+                    'id' => $row['comment_id'],
+                    'text' => $row['comment_text']
+                ];
+            }
+        }
+        return $feeds;
+    }
 
 
 }

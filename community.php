@@ -1,23 +1,7 @@
-<?php include __DIR__."/headers/header.php"; ?>
+<?php include __DIR__."/config/function.php";
+$main = new main($conn);
+include __DIR__."/headers/header.php"; ?>
 
-<!-- Navbar -->
-<nav class="navbar navbar-expand-lg navbar-dark bg-primary">
-  <div class="container">
-    <a class="navbar-brand" href="#">CommunityHub</a>
-    <button class="navbar-toggler" data-bs-toggle="collapse" data-bs-target="#nav">
-      <span class="navbar-toggler-icon"></span>
-    </button>
-    <div class="collapse navbar-collapse" id="nav">
-      <ul class="navbar-nav ms-auto">
-        <li class="nav-item"><a class="nav-link active" href="#">Community</a></li>
-        <li class="nav-item"><a class="nav-link" href="#">Members</a></li>
-        <li class="nav-item"><a class="nav-link" href="#">Events</a></li>
-      </ul>
-    </div>
-  </div>
-</nav>
-
-<!-- Header -->
 <div class="container mt-4">
   <div class="card">
     <div class="card-body text-center">
@@ -28,7 +12,6 @@
   </div>
 </div>
 
-<!-- Main Content -->
 <div class="container mt-4">
   <div class="row">
 
@@ -39,65 +22,56 @@
       <div class="card mb-3">
         <div class="card-body">
           <textarea class="form-control mb-2" rows="3" placeholder="What's on your mind?"></textarea>
+          <button class="btn btn-primary btn-sm bi bi-image"></button>
           <button class="btn btn-primary btn-sm">Post</button>
         </div>
       </div>
 
-      <!-- Post -->
-      <div class="card mb-3">
-        <div class="card-body">
-          <h6 class="fw-bold">Samuel Sunday</h6>
-          <p>Excited to be part of this amazing community! 🚀</p>
-          <div class="d-flex gap-2">
-            <button class="btn btn-outline-primary btn-sm">Like</button>
-            <button class="btn btn-outline-secondary btn-sm">Comment</button>
+      <!-- Display Feeds -->
+      <?php foreach ($main->feeds() as $feed): ?>
+        <div class="card mb-3">
+          <div class="card-body">
+            <h6 class="fw-bold"><?= htmlspecialchars($feed['title']); ?></h6>
+            <p><?= htmlspecialchars($feed['content']); ?></p>
+
+            <!-- Comments -->
+            <?php if (!empty($feed['comments'])): ?>
+              <div class="border-top pt-2">
+                <h6>Comments:</h6>
+                <?php foreach ($feed['comments'] as $comment): ?>
+                  <p class="small text-muted"><?= htmlspecialchars($comment['text']); ?></p>
+                <?php endforeach; ?>
+              </div>
+            <?php endif; ?>
+
+            <!-- Action Buttons -->
+            <div class="d-flex gap-2 mb-3 my-3">
+              <button class="btn btn-outline-primary btn-sm bi bi-heart" onclick="sendlike(<?= $feed['id']; ?>)">
+                <span class="ms-1">Like</span>
+              </button>
+              <button
+                class="btn btn-outline-secondary btn-sm bi bi-chat"
+                data-bs-toggle="collapse"
+                data-bs-target="#commentForm<?= $feed['id']; ?>"
+                aria-expanded="false">
+                <span class="ms-1">Comment</span>
+              </button>
+            </div>
+
+            <!-- Collapsible Comment Form -->
+            <div class="collapse border-top pt-3" id="commentForm<?= $feed['id']; ?>">
+              <div class="input-group mb-2">
+                <input type="text" class="form-control" placeholder="Write a comment...">
+                <button class="btn btn-primary" onclick="sendcomment(<?= $feed['id']; ?>)">Send</button>
+              </div>
+            </div>
           </div>
         </div>
-      </div>
-
-   <!-- Post -->
-<div class="card mb-3">
-  <div class="card-body">
-
-    <h6 class="fw-bold">Jane Doe</h6>
-    <p>Anyone interested in collaborating on a new project?</p>
- <!-- Collapsible Comment Section -->
-    <div class="collapse border-top pt-3" id="commentForm1">
-      <div class="input-group mb-2">
-        <input type="text" class="form-control" placeholder="Write a comment...">
-        <button class="btn btn-primary">Send</button>
-      </div>
-
-      <div class="small text-muted">
-        <strong>Samuel:</strong> I'm interested 🚀
-      </div>
-    </div>
-    <!-- Action Buttons -->
-    <div class="d-flex gap-2 mb-3 my-3">
-      <button class="btn btn-outline-primary btn-sm">Like</button>
-
-      <!-- Toggle Button -->
-      <button
-        class="btn btn-outline-secondary btn-sm"
-        data-bs-toggle="collapse"
-        data-bs-target="#commentForm1"
-        aria-expanded="false">
-        Comment
-      </button>
-    </div>
-
-   
-
-  </div>
-</div>
-
-
+      <?php endforeach; ?>
     </div>
 
     <!-- Sidebar -->
     <div class="col-lg-4">
-
-      <!-- Members -->
       <div class="card mb-3">
         <div class="card-header fw-bold">Members</div>
         <ul class="list-group list-group-flush">
@@ -107,7 +81,6 @@
         </ul>
       </div>
 
-      <!-- Events -->
       <div class="card">
         <div class="card-header fw-bold">Upcoming Events</div>
         <div class="card-body">
@@ -116,11 +89,9 @@
           <button class="btn btn-outline-primary btn-sm">View Details</button>
         </div>
       </div>
-
     </div>
   </div>
 </div>
-
 
 <?php include __DIR__."/headers/footer.php"; ?>
 </body>

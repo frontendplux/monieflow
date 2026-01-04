@@ -113,3 +113,43 @@ BEGIN
     );
   END IF;
 END;
+
+
+-- Create feeds table
+CREATE TABLE IF NOT EXISTS feeds (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    img TEXT NOT NULL,
+    title VARCHAR(255) NOT NULL,
+    content TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_user_id (user_id)
+);
+
+-- Create comment table
+CREATE TABLE IF NOT EXISTS comment (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    feed_id INT NOT NULL,
+    user_id INT NOT NULL,
+    text TEXT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (feed_id) REFERENCES feeds(id) ON DELETE CASCADE,
+    INDEX idx_feed_id (feed_id),
+    INDEX idx_user_id (user_id)
+);
+
+-- Create likes table
+CREATE TABLE IF NOT EXISTS likes (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    feed_id INT NOT NULL,
+    user_id INT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (feed_id) REFERENCES feeds(id) ON DELETE CASCADE,
+    INDEX idx_feed_id (feed_id),
+    INDEX idx_user_id (user_id),
+    UNIQUE KEY unique_like (feed_id, user_id) -- prevents duplicate likes by same user
+);
+
+
+
+

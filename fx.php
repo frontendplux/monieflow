@@ -1,5 +1,5 @@
 <?php include __DIR__."/headers/header.php"; ?>
-<div class="d-flex position-fixed start-0 top-0 end-0 py-3 justify-content-between" style="background: #ffff;">
+<div class="d-flex position-fixed start-0 top-0 end-0 py-3 justify-content-between" style="background: #ffff; z-index: 400000;">
     <h5 class="m-0"><i onclick="history.back()" class="ri-arrow-left-s-line me-2 fs-2" style="cursor: pointer"></i>FX Trade</h5>
     <!-- <a href="/transactions.php" class="text-capitalize">see all</a> -->
 </div>

@@ -1,7 +1,8 @@
 <?php 
+include __DIR__."/config/function.php"; 
+$main = new main($conn);
 include __DIR__."/headers/header.php"; 
 
-$main = new main($conn);
 
 if (!$main->isLoggedIn()) {
     header('Location: /');
@@ -26,19 +27,6 @@ if(count($main->wallet_balance()) <  1){ $main->createAccount(6);}
 </style>
 <div class="container py-4 mb-5">
 
-  <!-- Header -->
-  <div class="d-flex justify-content-between align-items-center mb-4 gap-3">
-    <div>
-        <h4>Welcome!</h4>
-        <div class="text-muted text-uppercase" style="font-size:small"><?= $main->getUserData()['data']['user'] ?></div>
-    </div>
-    <div class="d-flex gap-2 align-items-center">
-      <a class="btn rounded-circle bg-white btn-sm"><i class="ri-add-line fs-3"></i></a>
-      <a class="btn rounded-circle bg-white btn-sm"><i class="ri-notification-line fs-3"></i></a>
-      <a href=""><img style="width: 50px; height: 50px;" src="/images/<?= $main->getUserData()['data']['profile']['img'] ?? 'user.png' ?>" alt=""></a>
-    </div>
-  </div>
-
  <!-- Wallet Swiper -->
 <div class="swiper walletSwiper p-0 mb-4 w-100">
   <div class="swiper-wrapper w-100 p-0">
@@ -53,7 +41,7 @@ if(count($main->wallet_balance()) <  1){ $main->createAccount(6);}
   ?>
   <?php foreach ($main->wallet_balance() as $value): ?>
     <div class="swiper-slide p-0">
-      <div class="wallet-card" style="background:<?= $gradient[rand(0,3)] ?>">
+      <div class="wallet-card p-2 rounded" style="background:<?= $gradient[rand(0,3)] ?>">
         <h6><?= currencyIdToSymbols($conn, $value['currency_id'])[1]; ?></h6>
         <div class="d-flex justify-content-between">
           <h3>

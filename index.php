@@ -1,236 +1,166 @@
-<!DOCTYPE html>
-<?php
-include __DIR__."/config/function.php";
-$main = new Main($conn);
-if ($main->isLoggedIn()) {
-    header("Location: /home.php");
-    exit;
-} 
-?>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
-<title>MonieFlow</title>
-
+<?php include __DIR__."/config/function.php"; 
+$main=new main($conn)?>
+<?php include __DIR__."/headers/header.php"; ?>
+ <!-- ------------------------------------- -->
+  <div class="container-fluid p-0 mb-5 bg-dark">
+    <div class="chart-wrapper position-relative mb-4">
+        <canvas id="priceChart"></canvas>
+    </div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 <style>
-* {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
-    font-family: "Segoe UI", Arial, sans-serif;
-}
-
-html, body {
-    height: 100%;
-}
-
-/* Layout */
-.container {
-    display: flex;
-    height: 100%;
-}
-
-/* LEFT SIDE */
-.left {
-    flex: 1;
-    background:
-        linear-gradient(rgba(0,0,0,.75), rgba(110,15,15,.6)),
-        url("1.jpg") center/cover no-repeat;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 60px 30px;
-    color: white;
-}
-
-.brand {
-    max-width: 560px;
-    animation: fadeUp 1.2s ease;
-}
-
-.brand h1 {
-    font-size: 2.8rem;
-    margin-bottom: 12px;
-}
-
-.brand p {
-    font-size: 1rem;
-    line-height: 1.6;
-    color: #eee;
-    margin-bottom: 25px;
-}
-
-/* CTA BUTTON */
-.brand .cta {
-    display: inline-block;
-    padding: 13px 38px;
-    background: linear-gradient(135deg, #ff4d4d, #b30000);
-    color: white;
-    text-decoration: none;
-    border-radius: 30px;
-    font-weight: 600;
-    transition: .3s;
-}
-
-.brand .cta:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 8px 20px rgba(255,77,77,.45);
-}
-
-/* RIGHT SIDE */
-.right {
-    flex: 1;
-    background: #0f0f0f;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-.login-box {
+.chart-wrapper {
     width: 100%;
-    max-width: 480px;
-    background: #161616;
-    padding: 35px;
-    border-radius: 18px;
-    box-shadow: 0 15px 40px rgba(0,0,0,.6);
-    animation: fadeUp 1.3s ease;
+    height: 500px; 
+    position: relative;
 }
-
-.login-box h2 {
-    color: white;
-    margin-bottom: 22px;
-    text-align: center;
-}
-
-.login-box input {
+@media(max-width:500px){
+  .chart-wrapper {
     width: 100%;
-    padding: 14px;
-    margin-bottom: 15px;
-    border-radius: 10px;
-    border: none;
-    background: #222;
-    color: white;
-    outline: none;
+    height: 300px; 
+    position: relative;
 }
-
-.login-box input::placeholder {
-    color: #aaa;
 }
-
-.login-box button {
-    width: 100%;
-    padding: 14px;
-    border-radius: 30px;
-    border: none;
-    background: linear-gradient(135deg, #ff4d4d, #b30000);
-    color: white;
-    font-weight: 600;
-    cursor: pointer;
-    transition: .3s;
-}
-
-.login-box button:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 8px 20px rgba(255,77,77,.45);
-}
-
-.login-box .small {
-    margin-top: 15px;
-    text-align: center;
-    font-size: .85rem;
-    color: #bbb;
-}
-
-.login-box .small a {
-    color: #ff4d4d;
-    text-decoration: none;
-}
-
-/* MOBILE */
-@media (max-width: 768px) {
-    .container {
-        flex-direction: column;
-    }
-
-    .right {
-        display: none;
-    }
-
-    .left {
-        align-items: flex-end;
-        justify-content: center;
-        text-align: center;
-    }
-}
-
-/* Animation */
-@keyframes fadeUp {
-    from { opacity: 0; transform: translateY(30px); }
-    to   { opacity: 1; transform: translateY(0); }
+#priceChart {
+    width: 100% !important;
+    height: 100% !important;
 }
 </style>
-</head>
 
-<body>
-<div class="container-fluid d-flex h-100 p-0">
-
-    <div class="left">
-        <div class="brand">
-            <h1 style="font-family:cursive;">MonieFlow</h1>
-            <p>Make unlimited transactions seamlessly and securely through MonieFlow.</p>
-            <a href="/main.php" class="d-sm-none cta">Get Started</a> 
-            <a href="/signup.php" class="d-sm-inline d-none cta">Get Started</a> 
-        </div>
-    </div>
-
-    <div class="right">
-        <div class="login-box">
-            <h2>Welcome Back</h2>
-            <input type="email" id="username" placeholder="Email address">
-            <input type="password" id="password" placeholder="Password">
-            <button onclick="login(this)">Login</button>
-            <div class="small">
-                Don’t have an account? <a href="/signup.php">Sign up</a>
-            </div>
-        </div>
-    </div>
-
-</div>
-</body>
-<script src="/script.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
-function login(e) {
-    showLoading();
-    const username = document.getElementById('username').value.trim();
-    const password = document.getElementById('password').value.trim();
+const ctx = document.getElementById('priceChart').getContext('2d');
 
-    if (!username || !password) {
-        alert("Both fields are required!");
-        hideLoading();
-        return;
+// Gradient fill
+let gradient = ctx.createLinearGradient(0,0,0,300);
+gradient.addColorStop(0, 'rgba(34,197,94,0.4)');
+gradient.addColorStop(1, 'rgba(34,197,94,0.05)');
+
+const data = {
+    labels: [200,300,400,500,600,700,800],
+    datasets: [{
+        label: 'BTC/USDT',
+        data: [30,45,67,89,400,200,300],
+        borderColor: '#22c55e',
+        backgroundColor: gradient,
+        borderWidth: 0.2,
+        tension: 0.4,
+        pointRadius: 0,
+        fill: true
+    }]
+};
+
+// Plugin to draw floating price on the right side
+const floatingPricePlugin = {
+    id: 'floatingPrice',
+    afterDatasetsDraw(chart) {
+        const ctx = chart.ctx;
+        const dataset = chart.data.datasets[0];
+        const meta = chart.getDatasetMeta(0);
+        if(dataset.data.length === 0) return;
+
+        const lastPoint = meta.data[meta.data.length - 1];
+        const value = dataset.data[dataset.data.length - 1];
+        const label = '$' + value.toFixed(2);
+
+        // Clamp inside chart
+        let y = lastPoint.y;
+        const top = chart.chartArea.top + 5;
+        const bottom = chart.chartArea.bottom - 5;
+        if(y < top) y = top;
+        if(y > bottom) y = bottom;
+
+        const x = chart.chartArea.right - 10;
+
+        ctx.save();
+        ctx.font = 'bold 14px Arial';
+        ctx.textAlign = 'right';
+        ctx.textBaseline = 'middle';
+
+        // Draw background
+        const padding = 6;
+        const textWidth = ctx.measureText(label).width;
+        ctx.fillStyle = 'rgba(0,0,0,0.8)';
+        ctx.fillRect(x - textWidth - padding, y - 10, textWidth + padding*2, 20);
+
+        // Green/red based on price movement
+        let color = '#22c55e';
+        if(dataset.data.length > 1){
+            const prev = dataset.data[dataset.data.length - 2];
+            color = value >= prev ? '#22c55e' : '#ef4444';
+        }
+        ctx.fillStyle = color;
+        ctx.fillText(label, x, y);
+
+        ctx.restore();
+    }
+};
+
+
+const priceChart = new Chart(ctx, {
+    type: 'line',
+    data: data,
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+            legend: { display: false },
+            tooltip: {
+                backgroundColor: '#020617',
+                titleColor: '#e5e7eb',
+                bodyColor: '#e5e7eb',
+                displayColors: false
+            }
+        },
+        scales: {
+    x: { 
+        grid: { display: false, drawTicks: false, drawBorder: false }, 
+        ticks: { display: false } 
+    },
+    y: { 
+        grid: { display: false, drawTicks: false, drawBorder: false }, 
+        ticks: { display: false } 
+    }
+}
+    },
+    plugins: [floatingPricePlugin]
+});
+
+
+
+function addData(chart, label, value){
+    chart.data.labels.push(label);
+    chart.data.datasets[0].data.push(value);
+
+    // Keep last 20 points visible
+    if(chart.data.labels.length > 20){
+        chart.data.labels.shift();
+        chart.data.datasets[0].data.shift();
     }
 
-    const fd = new FormData();
-    fd.append("username", username);
-    fd.append("password", password);
-    fd.append("action", "login");
+    // Dynamic Y-axis based on visible points
+    const visibleData = chart.data.datasets[0].data;
+    const min = Math.min(...visibleData);
+    const max = Math.max(...visibleData);
+    chart.options.scales.y.min = min - (max-min)*0.1;
+    chart.options.scales.y.max = max + (max-min)*0.1;
 
-    fetch("/req.php", {
-        method: "POST",
-        body: fd
-    })
-    .then(res => res.json())
-    .then(data => {
-        if (data[0]) {
-            window.location.href = "/home.php";
-        } else {
-            alert(data[1] || "Login failed");
-        }
-    })
-    .catch(err => console.error("Error:", err))
-    .finally(() => hideLoading());
+    chart.update('none'); // no animation for smooth scrolling
 }
+
+// Auto-update every second
+setInterval(()=>{
+    const now = new Date();
+    const timeLabel = now.getHours()+':'+String(now.getMinutes()).padStart(2,'0')+':'+String(now.getSeconds()).padStart(2,'0');
+
+    let lastPrice = priceChart.data.datasets[0].data.slice(-1)[0] || 42500;
+    let change = (Math.random()-0.5)*50; 
+    let newPrice = Math.max(0, lastPrice+change);
+
+    addData(priceChart, timeLabel, newPrice);
+},1000);
 </script>
+
+</body>
 </html>
