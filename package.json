@@ -1,0 +1,20 @@
+{
+    "scripts": {
+        "x": "php -S 0.0.0.0:3000"
+    },
+    "name": "intercept",
+    "version": "1.0.0",
+    "description": "",
+    "main": "index.js",
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/frontendplux/monieflow.git"
+    },
+    "keywords": [],
+    "author": "",
+    "license": "ISC",
+    "bugs": {
+        "url": "https://github.com/frontendplux/monieflow/issues"
+    },
+    "homepage": "https://github.com/frontendplux/monieflow#readme"
+}

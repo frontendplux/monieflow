@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Monieflow – Sign Up</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <!-- Bootstrap CSS -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+
+  <!-- Remix Icon (for question icon) -->
+  <link href="https://cdn.jsdelivr.net/npm/remixicon/fonts/remixicon.css" rel="stylesheet">
+</head>
+<body class="bg-light">
+
+<div class="d-flex justify-content-center align-items-center vh-100">
+  <div>
+    <h1 class="text-center text-capitalize my-4 text-primary">monieflow</h1>
+
+    <div class="bg-white shadow rounded p-3" style="max-width: 450px; width: 100%;">
+      <h3 class="text-center">Create a new account</h3>
+      <div class="text-center">It's quick and easy.</div>
+      <hr>
+
+      <div>
+        <div class="d-flex gap-2 mb-3">
+          <input type="text" name="firstName" class="form-control" placeholder="First name" required>
+          <input type="text" name="lastName" class="form-control" placeholder="Last name" required>
+        </div>
+
+        <div class="mb-1">
+          Date of birth <i class="ri-question-fill"></i>
+        </div>
+
+        <div class="d-flex gap-2 mb-3">
+          <!-- Day -->
+          <select name="day" class="form-control" required>
+            <option value="">Day</option>
+            <!-- 1–31 -->
+            <script>
+              for (let i = 1; i <= 31; i++) {
+                document.write(`<option value="${i}">${i}</option>`);
+              }
+            </script>
+          </select>
+
+          <!-- Month -->
+          <select name="month" class="form-control" required>
+            <option value="">Month</option>
+            <option value="1">January</option>
+            <option value="2">February</option>
+            <option value="3">March</option>
+            <option value="4">April</option>
+            <option value="5">May</option>
+            <option value="6">June</option>
+            <option value="7">July</option>
+            <option value="8">August</option>
+            <option value="9">September</option>
+            <option value="10">October</option>
+            <option value="11">November</option>
+            <option value="12">December</option>
+          </select>
+
+          <!-- Year -->
+          <select name="year" class="form-control" required>
+            <option value="">Year</option>
+            <script>
+              const year = new Date().getFullYear();
+              for (let i = 0; i < 100; i++) {
+                document.write(`<option value="${year - i}">${year - i}</option>`);
+              }
+            </script>
+          </select>
+        </div>
+
+        <label class="mb-1">Gender</label>
+        <div class="d-flex justify-content-between mb-3 gap-3">
+          <label class="d-flex justify-content-between w-100 border p-2 rounded">
+            Female
+            <input type="radio" name="sex" value="Female">
+          </label>
+
+          <label class="d-flex justify-content-between w-100 border p-2 rounded">
+            Male
+            <input type="radio" name="sex" value="Male">
+          </label>
+
+          <label class="d-flex justify-content-between w-100 border p-2 rounded">
+            Custom
+            <input type="radio" name="sex" value="Custom">
+          </label>
+        </div>
+
+        <input
+          type="email"
+          name="email"
+          class="form-control mb-3"
+          placeholder="Mobile number or email address"
+          required
+        >
+
+        <input
+          type="password"
+          name="password"
+          class="form-control mb-3"
+          placeholder="New password"
+          required
+        >
+
+        <p style="font-size: small;">
+          People who use our service may have uploaded your contact information to Facebook.
+          <a href="#">Learn more.</a>
+        </p>
+
+        <p style="font-size: small;">
+          By clicking Sign up, you agree to our Terms, Privacy Policy and Cookies Policy.
+          You may receive SMS notifications from us and can opt out at any time.
+        </p>
+
+        <div class="text-center">
+          <button type="submit" class="btn btn-success px-5 fw-bold py-2">
+            Sign Up
+          </button>
+        </div>
+
+        <div class="text-center my-3">
+          <a class="text-decoration-none" href="/">Already have an account?</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

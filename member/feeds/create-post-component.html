@@ -1,0 +1,574 @@
+
+    <style>
+        textarea::-webkit-scrollbar { width: 6px; }
+        textarea::-webkit-scrollbar-thumb { background-color: #dbdbdb; border-radius: 10px; }
+
+        emoji-picker {
+            width: 100%;
+            height: 300px;
+            --num-columns: 8;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+            border-radius: 8px;
+        }
+        
+        #emojiPickerWrapper {
+            margin-top: 10px;
+            width: 100%;
+            z-index: 1060; 
+        }
+
+        .preview-container {
+            position: relative;
+            display: inline-block;
+            margin: 5px;
+        }
+
+        .preview-img {
+            width: 100px;
+            height: 100px;
+            object-fit: cover;
+            border-radius: 8px;
+            border: 1px solid #ddd;
+        }
+
+        .remove-btn {
+            position: absolute;
+            top: -5px;
+            right: -5px;
+            background: rgba(255, 0, 0, 0.8);
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            font-size: 12px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-content { border-radius: 15px; }
+    </style>
+</head>
+
+<div class="modal fade" id="feedPostModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content border-0 shadow-lg">
+
+            <div class="modal-header border-bottom-0">
+                <h5 class="modal-title fw-bold">Create Post</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+
+            <div class="modal-body">
+                <textarea id="postText" class="form-control border-0 fs-5 mb-2" rows="4"
+                    placeholder="What's on your mind? 😊" style="resize: none; outline: none; box-shadow: none;"></textarea>
+
+                <div class="d-flex gap-2 mb-3 flex-wrap">
+                    <button class="btn btn-light btn-sm rounded-pill px-3" onclick="toggleEmojiPicker(event)">
+                        <i class="ri-emotion-line text-warning"></i> 😀 Emoji
+                    </button>
+
+                    <button class="btn btn-light btn-sm rounded-pill px-3" onclick="document.getElementById('postImages').click()">
+                        <i class="ri-image-add-line text-success"></i> Images
+                    </button>
+                    
+                    <!-- <button class="btn btn-light btn-sm rounded-pill px-3" onclick="document.getElementById('postVideo').click()">
+                        <i class="ri-video-add-line text-danger"></i> Video
+                    </button>
+                    <input id="postVideo" type="file" accept="video/*" hidden>
+
+                    <button class="btn btn-light btn-sm rounded-pill px-3" onclick="document.getElementById('postAudio').click()">
+                        <i class="ri-music-2-line text-primary"></i> Audio
+                    </button> -->
+                    <input id="postImages" type="file" multiple accept="image/*" hidden onchange="previewFiles()">
+                </div>
+
+                <div id="emojiPickerWrapper" class="d-none">
+                    <emoji-picker></emoji-picker>
+                </div>
+
+                <div id="previewArea" class="d-flex flex-wrap"></div>
+            </div>
+
+            <div class="modal-footer border-top-0">
+                <button class="btn btn-light fw-semibold" data-bs-dismiss="modal">Cancel</button>
+                <button id="submitBtn" class="btn btn-primary px-5 fw-semibold" onclick="submitPost()">Post</button>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+
+
+<!-- comment section  -->
+<div class="modal fade" id="commentModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg modal-fullscreen-sm-down">
+        <div class="modal-content">
+            <div class="modal-header align-items-center">
+                <div class="d-flex align-items-center gap-2">
+                    <h5 class="modal-title fw-bold mb-0">Comments</h5>
+                    <span class="badge bg-soft-primary text-primary rounded-pill" id="totalCommentCount">0</span>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            
+            <div class="modal-body p-0" style="height: 70vh; display: flex; flex-direction: column;">
+                <div id="commentList" class="flex-grow-1 overflow-auto p-3 bg-light">
+                    </div>
+
+                <div class="p-3 border-top bg-white">
+                    <div id="replyingTo" class="small text-muted mb-2 d-none">
+                        Replying to <span id="replyUser" class="fw-bold text-primary"></span> 
+                        <button class="btn btn-sm text-danger p-0 ms-2" onclick="cancelReply()">
+                            <i class="ri-close-circle-line"></i> Cancel
+                        </button>
+                    </div>
+                    
+                    <div class="input-group align-items-center bg-light rounded-3 px-2">
+                        <button class="btn btn-link text-muted p-2" type="button" id="emojiTrigger">
+                            <i class="ri-emotion-happy-line fs-4"></i>
+                        </button>
+                        
+                        <input type="text" id="commentInput" class="form-control border-0 bg-transparent py-2" placeholder="Write a comment...">
+                        
+                        <input type="hidden" id="activeFeedId">
+                        <input type="hidden" id="activeParentId" value="0">
+                        
+                        <button class="btn btn-primary rounded-3 px-3 py-1 ms-2" onclick="submitComment()">
+                            Post
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- image preview  -->
+<div class="modal fade" id="mediaPopModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-xl">
+        <div class="modal-content bg-transparent border-0">
+            <div class="modal-body p-0 position-relative text-center">
+                <button type="button" class="btn-close btn-close-white position-absolute top-0 end-0 m-3 z-3" data-bs-dismiss="modal"></button>
+                <div id="popContent"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+<script>
+    // 1. Update the Total Count when loading comments
+// async function openComments(feedId, totalCount) {
+//     document.getElementById('activeFeedId').value = feedId;
+//     document.getElementById('totalCommentCount').innerText = totalCount;
+    
+//     const modal = new bootstrap.Modal(document.getElementById('commentModal'));
+//     modal.show();
+    
+//     loadComments(feedId);
+// }
+
+// 2. Simple Emoji Trigger
+// Note: For a full Sticker UI, you can use "Emoji Mart" or "FG Emoji Picker"
+document.getElementById('emojiTrigger').addEventListener('click', () => {
+    const input = document.getElementById('commentInput');
+    // For native mobile/OS emoji picker, we can focus and suggest
+    // Or toggle a hidden div with common emojis:
+    const emojis = ['❤️', '😂', '🙌', '🔥', '👏', '😢', '😍', '😮'];
+    
+    // Quick simple toggle (You can expand this into a proper popover)
+    let emojiBar = document.getElementById('quickEmojiBar');
+    if (!emojiBar) {
+        emojiBar = document.createElement('div');
+        emojiBar.id = 'quickEmojiBar';
+        emojiBar.className = 'd-flex gap-2 p-2 border-bottom animate__animated animate__fadeIn';
+        emojis.forEach(e => {
+            const span = document.createElement('span');
+            span.innerHTML = e;
+            span.style.cursor = 'pointer';
+            span.onclick = () => { input.value += e; input.focus(); };
+            emojiBar.appendChild(span);
+        });
+        input.parentElement.parentElement.prepend(emojiBar);
+    } else {
+        emojiBar.remove();
+    }
+});
+
+
+// 1. Define the loading function FIRST
+async function loadComments(feedId) {
+    const listContainer = document.getElementById('commentList');
+    
+    // Show a small loader while fetching
+    listContainer.innerHTML = '<div class="text-center py-5"><div class="spinner-border text-primary"></div></div>';
+
+    try {
+        const response = await fetch('/member/feeds/post.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'load-comments', feed_id: feedId })
+        });
+        
+        const data = await response.json();
+
+        if (data.status === 'success') {
+            // Update the HTML with nested comments
+            listContainer.innerHTML = data.html || '<p class="text-center text-muted py-5">No comments yet. Be the first!</p>';
+            // Update the badge count in the header
+            document.getElementById('totalCommentCount').innerText = data.total;
+        }
+    } catch (error) {
+        console.error("Error loading comments:", error);
+        listContainer.innerHTML = '<p class="text-center text-danger py-5">Failed to load comments.</p>';
+    }
+}
+
+// 2. Define the Modal Open function
+function openComments(feedId, currentCount = 0) {
+    // Set the hidden input so we know which post we are commenting on
+    document.getElementById('activeFeedId').value = feedId;
+    
+    // Set the initial count from the feed UI
+    document.getElementById('totalCommentCount').innerText = currentCount;
+
+    // Trigger the Bootstrap Modal
+    const commentModalElement = document.getElementById('commentModal');
+    const modal = bootstrap.Modal.getOrCreateInstance(commentModalElement);
+    modal.show();
+
+    // Call the loading function defined above
+    loadComments(feedId);
+}
+
+
+async function likeComment(commentId, element) {
+    try {
+        const response = await fetch('/member/feeds/post.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'like-comment', comment_id: commentId })
+        });
+        const res = await response.json();
+
+        if (res.status === 'success') {
+            const countSpan = element.querySelector('.l-cnt');
+            countSpan.innerText = res.count;
+            
+            if (res.type === 'liked') {
+                element.classList.replace('text-muted', 'text-primary');
+                element.classList.add('fw-bold');
+            } else {
+                element.classList.replace('text-primary', 'text-muted');
+                element.classList.remove('fw-bold');
+            }
+        }
+    } catch (e) { console.error("Like error", e); }
+}
+// 3. Define the Reply helper
+function prepareReply(commentId, username) {
+    document.getElementById('activeParentId').value = commentId;
+    document.getElementById('replyUser').innerText = username;
+    document.getElementById('replyingTo').classList.remove('d-none');
+    document.getElementById('commentInput').focus();
+}
+
+// 4. Define the Cancel Reply helper
+function cancelReply() {
+    document.getElementById('activeParentId').value = 0;
+    document.getElementById('replyingTo').classList.add('d-none');
+}
+
+// 3. Update counter after successful post
+async function submitComment() {
+    const feedId = document.getElementById('activeFeedId').value;
+    const parentId = document.getElementById('activeParentId').value;
+    const content = document.getElementById('commentInput').value;
+
+    if (!content.trim()) return;
+
+    const res = await fetch('/member/feeds/post.php', {
+        method: 'POST',
+        body: JSON.stringify({ 
+            action: 'add-comment', 
+            feed_id: feedId, 
+            reply_id: parentId, 
+            content: content 
+        })
+    });
+    
+    const data = await res.json();
+    if (data.status === 'success') {
+        document.getElementById('commentInput').value = "";
+        // Increment the header counter locally for speed
+        const counter = document.getElementById('totalCommentCount');
+        counter.innerText = parseInt(counter.innerText) + 1;
+        
+        cancelReply();
+        loadComments(feedId);
+    }
+}
+</script>
+
+<script>
+    function popMedia(path, type) {
+    const popContent = document.getElementById('popContent');
+    const modal = new bootstrap.Modal(document.getElementById('mediaPopModal'));
+    
+    if (type === 'image') {
+        popContent.innerHTML = `<img src="/uploads/feeds/${path}" class="img-fluid rounded shadow-lg" style="max-height: 90vh;">`;
+    } else if (type === 'video') {
+        popContent.innerHTML = `
+            <video controls autoplay class="w-100 rounded shadow-lg" style="max-height: 90vh;">
+                <source src="/${path}" type="video/mp4">
+            </video>`;
+    }
+    
+    modal.show();
+    
+    // Stop video when modal closes
+    document.getElementById('mediaPopModal').addEventListener('hidden.bs.modal', function () {
+        popContent.innerHTML = '';
+    });
+}
+</script>
+
+
+<script>
+    let uploadedMedia = []; // Stores base64 strings and types
+
+    // 1. Reset Modal on Call
+    const myModalEl = document.getElementById('feedPostModal');
+    myModalEl.addEventListener('show.bs.modal', function () {
+        document.getElementById('postText').value = "";
+        document.getElementById('previewArea').innerHTML = "";
+        document.getElementById('emojiPickerWrapper').classList.add('d-none');
+        uploadedMedia = [];
+    });
+
+    // 2. Toggle Emoji Picker
+    function toggleEmojiPicker(event) {
+        event.stopPropagation();
+        const wrapper = document.getElementById('emojiPickerWrapper');
+        wrapper.classList.toggle('d-none');
+    }
+
+    // 3. Emoji Selection Logic
+    document.addEventListener('DOMContentLoaded', () => {
+        const picker = document.querySelector('emoji-picker');
+        const textArea = document.getElementById('postText');
+        const wrapper = document.getElementById('emojiPickerWrapper');
+
+        picker.addEventListener('emoji-click', event => {
+            const emoji = event.detail.unicode;
+            const start = textArea.selectionStart;
+            const end = textArea.selectionEnd;
+            textArea.value = textArea.value.substring(0, start) + emoji + textArea.value.substring(end);
+            textArea.selectionStart = textArea.selectionEnd = start + emoji.length;
+            textArea.focus();
+        });
+
+        document.addEventListener('click', (e) => {
+            if (!wrapper.contains(e.target) && !e.target.closest('button')) {
+                wrapper.classList.add('d-none');
+            }
+        });
+    });
+
+    // 4. Handle Multiple Images & Previews
+    function previewFiles() {
+        const preview = document.getElementById('previewArea');
+        const files = document.getElementById('postImages').files;
+
+        for (const file of files) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const base64String = e.target.result;
+                const mediaId = Date.now() + Math.random();
+                
+                // Add to data array
+                uploadedMedia.push({ id: mediaId, file_type: file.type, file: base64String });
+
+                // Create UI
+                const container = document.createElement("div");
+                container.className = "preview-container";
+                container.id = `media-${mediaId}`;
+                container.innerHTML = `
+                    <img src="${base64String}" class="preview-img">
+                    <button class="remove-btn" onclick="removeMedia(${mediaId})"><i class="ri-close-line"></i></button>
+                `;
+                preview.appendChild(container);
+            }
+            reader.readAsDataURL(file);
+        }
+    }
+
+    function removeMedia(id) {
+        uploadedMedia = uploadedMedia.filter(item => item.id !== id);
+        document.getElementById(`media-${id}`).remove();
+    }
+
+    // 5. Submit as Webhook JSON
+    async function submitPost() {
+        const text = document.getElementById('postText').value;
+        const submitBtn = document.getElementById('submitBtn');
+
+        if(text.trim() === "" && uploadedMedia.length === 0) {
+            return alert("Post cannot be empty!");
+        }
+
+        const payload = {
+            action: "create-feeds",
+            content: text,
+            media: uploadedMedia.map(m => ({ file_type: m.file_type, file: m.file }))
+        };
+
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = "Posting...";
+
+        try {
+            const response = await fetch('/member/feeds/post.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            }).then(res => res.json());
+             
+            if (response.status) {
+                window.location.reload();
+                // bootstrap.Modal.getInstance(myModalEl).hide();
+            } else {
+                alert("Server error. Check console.");
+            }
+        } catch (error) {
+            console.error("Error:", error);
+            alert("Webhook sent (Check Network Tab if running on localhost)");
+        } finally {
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = "Post";
+        }
+    }
+</script>
+
+
+<script>
+    // Open Modal & Load Comments
+// function openComments(feedId) {
+//     document.getElementById('activeFeedId').value = feedId;
+//     const modal = new bootstrap.Modal(document.getElementById('commentModal'));
+//     loadComments(feedId);
+//     modal.show();
+// }
+
+// async function loadComments(feedId) {
+//     const res = await fetch(`/member/feeds/post.php`, {
+//         method: 'POST',
+//         body: JSON.stringify({ action: 'load-comments', feed_id: feedId })
+//     });
+//     const data = await res.json();
+//     document.getElementById('commentList').innerHTML = data.html;
+// }
+
+// // Handle Replying
+// function setReply(commentId, username) {
+//     document.getElementById('activeParentId').value = commentId;
+//     document.getElementById('replyingTo').classList.remove('d-none');
+//     document.getElementById('replyUser').innerText = username;
+//     document.getElementById('commentInput').focus();
+// }
+
+// function cancelReply() {
+//     document.getElementById('activeParentId').value = 0;
+//     document.getElementById('replyingTo').classList.add('d-none');
+// }
+
+// // Submit Comment
+// async function submitComment() {
+//     const feedId = document.getElementById('activeFeedId').value;
+//     const parentId = document.getElementById('activeParentId').value;
+//     const text = document.getElementById('commentInput').value;
+
+//     if(!text) return;
+
+//     await fetch(`/member/feeds/post.php`, {
+//         method: 'POST',
+//         body: JSON.stringify({ action: 'add-comment', feed_id: feedId, parent_id: parentId, comment: text })
+//     });
+
+//     document.getElementById('commentInput').value = "";
+//     cancelReply();
+//     loadComments(feedId); // Refresh list
+// }
+
+
+
+
+
+
+
+
+
+
+
+
+
+// let currentFeedId = null;
+// let currentReplyId = null;
+
+// async function openComments(id) {
+//     currentFeedId = id;
+//     const modal = new bootstrap.Modal(document.getElementById('commentModal'));
+//     modal.show();
+    
+//     const res = await fetch('/member/feeds/post.php', {
+//         method: 'POST',
+//         body: JSON.stringify({ action: 'load-comments', feed_id: id })
+//     });
+//     const data = await res.json();
+//     document.getElementById('commentBody').innerHTML = data.html;
+// }
+
+// function setReply(id, name) {
+//     currentReplyId = id;
+//     document.getElementById('replyIndicator').classList.remove('d-none');
+//     document.getElementById('replyName').innerText = name;
+//     document.getElementById('commentInput').focus();
+// }
+
+// async function likeComment(id, btn) {
+//     const res = await fetch('/member/feeds/post.php', {
+//         method: 'POST',
+//         body: JSON.stringify({ action: 'like', comment_id: id })
+//     });
+//     const data = await res.json();
+//     btn.querySelector('span').innerText = data.count;
+//     btn.className = (data.type === 'liked') ? 'text-decoration-none text-primary fw-bold' : 'text-decoration-none text-muted';
+// }
+
+// async function submitComment() {
+//     const content = document.getElementById('commentInput').value;
+//     if(!content) return;
+
+//     await fetch('/member/feeds/post.php', {
+//         method: 'POST',
+//         body: JSON.stringify({ 
+//             action: 'add-comment', 
+//             feed_id: currentFeedId, 
+//             reply_id: currentReplyId, 
+//             content: content 
+//         })
+//     });
+    
+//     document.getElementById('commentInput').value = "";
+//     cancelReply();
+//     openComments(currentFeedId); // Refresh
+// }
+
+// function cancelReply() {
+//     currentReplyId = null;
+//     document.getElementById('replyIndicator').classList.add('d-none');
+// }
+</script>
