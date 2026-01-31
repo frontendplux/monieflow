@@ -1,0 +1,12 @@
+html,body{
+  background: rgba(231, 227, 227, 0.752);
+}
+.active-nav-header{
+  border-bottom: 4px solid #0b0be356 !important;
+  color: rgba(0, 0, 255, 0.672); transition: 0.5s;
+}
+
+.line-clamp-2{
+  display: -webkit-box; line-clamp: 2; -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical; overflow: hidden; text-overflow: ellipsis;
+}

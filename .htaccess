@@ -1,0 +1,20 @@
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+
+  # Allow API requests to pass through
+  RewriteRule ^api(/.*)?$ - [L,NC]
+
+  # Allow uploads to pass through
+  RewriteRule ^uploads(/.*)?$ - [L,NC]
+
+  # Serve existing files normally
+  RewriteCond %{REQUEST_FILENAME} -f [OR]
+  RewriteCond %{REQUEST_FILENAME} -d
+  RewriteRule ^ - [L]
+
+  # Redirect everything else to the React SPA inside /dist
+  RewriteRule ^ dist/index.html [L,NC]
+</IfModule>
+
+# Optional: disable directory listing
+Options -Indexes
