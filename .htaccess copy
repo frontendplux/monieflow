@@ -1,27 +1,20 @@
-# Fix MIME types for Vite / React
-<IfModule mod_mime.c>
-  AddType application/javascript .js
-  AddType text/css .css
-  AddType application/json .json
-  AddType image/svg+xml .svg
-</IfModule>
-
 <IfModule mod_rewrite.c>
   RewriteEngine On
 
-  # Allow API requests
+  # Allow API requests to pass through
   RewriteRule ^api(/.*)?$ - [L,NC]
 
-  # Allow uploads
+  # Allow uploads to pass through
   RewriteRule ^uploads(/.*)?$ - [L,NC]
 
-  # Serve existing files
+  # Serve existing files normally
   RewriteCond %{REQUEST_FILENAME} -f [OR]
   RewriteCond %{REQUEST_FILENAME} -d
   RewriteRule ^ - [L]
 
-  # SPA fallback to React (Vite)
+  # Redirect everything else to the React SPA inside /dist
   RewriteRule ^ dist/index.html [L,NC]
 </IfModule>
 
+# Optional: disable directory listing
 Options -Indexes
