@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>monieFlow | Discover Groups</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/remixicon@3.5.0/fonts/remixicon.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+    
+    <style>
+        body {
+            background-color: #f0f2f5;
+            font-family: 'Inter', sans-serif;
+        }
+
+        /* Hero Section Gradient */
+        .hero-bg {
+            background: linear-gradient(135deg, #1877f2 0%, #6366f1 100%);
+            padding: 80px 0 120px 0;
+        }
+
+        /* Search Input Styling */
+        .search-container {
+            border-radius: 50px;
+            background: #fff;
+            padding: 5px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+        }
+
+        .search-container input {
+            border: none;
+            box-shadow: none !important;
+        }
+
+        /* Pull content up over hero */
+        .main-content-wrapper {
+            margin-top: -60px;
+        }
+
+        /* Card Hover Animations */
+        .group-card {
+            transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+            border-radius: 20px !important;
+            overflow: hidden;
+            border: none;
+        }
+
+        .group-card:hover {
+            transform: translateY(-8px);
+            box-shadow: 0 15px 35px rgba(0,0,0,0.1) !important;
+        }
+
+        /* Category Sidebar List */
+        .category-item {
+            border: none !important;
+            margin-bottom: 5px;
+            border-radius: 12px !important;
+            font-weight: 600;
+            color: #4b4b4b;
+        }
+
+        .category-item.active {
+            background-color: #e7f3ff !important;
+            color: #1877f2 !important;
+        }
+
+        /* Avatar Stacking */
+        .avatar-group img {
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            border: 2px solid white;
+            margin-left: -10px;
+            object-fit: cover;
+        }
+        .avatar-group img:first-child { margin-left: 0; }
+
+        /* Hide Scrollbars */
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+        /* Icon Wrapper */
+        .group-icon-container {
+            width: 75px;
+            height: 75px;
+            margin-top: -40px;
+            margin-left: 20px;
+            border: 4px solid #fff;
+            border-radius: 18px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+        }
+    </style>
+</head>
+<body>
+
+<section class="hero-bg text-center text-white">
+    <div class="container">
+        <h1 class="display-5 fw-800 mb-3">Join Your Next Community</h1>
+        <p class="lead opacity-75 mb-5">Discover groups based on your interests, trade assets, and earn monieCoins.</p>
+        
+        <div class="row justify-content-center">
+            <div class="col-md-8 col-lg-6">
+                <div class="search-container d-flex align-items-center px-3">
+                    <i class="ri-search-2-line text-muted fs-4"></i>
+                    <input type="text" class="form-control form-control-lg" placeholder="Find communities...">
+                    <button class="btn btn-primary rounded-pill px-4 fw-bold">Search</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<main class="container main-content-wrapper pb-5">
+    <div class="row g-4">
+        
+        <aside class="col-lg-3 d-none d-lg-block">
+            <div class="card border-0 shadow-sm p-3 mb-4 sticky-top" style="top: 20px; border-radius: 18px;">
+                <h6 class="fw-bold mb-3 px-2">Browse by Category</h6>
+                <div class="list-group">
+                    <a href="#" class="list-group-item list-group-item-action category-item active">
+                        <i class="ri-compass-3-line me-2"></i> Explore All
+                    </a>
+                    <a href="#" class="list-group-item list-group-item-action category-item">
+                        <i class="ri-bit-coin-line me-2"></i> Crypto Traders
+                    </a>
+                    <a href="#" class="list-group-item list-group-item-action category-item">
+                        <i class="ri-gamepad-line me-2"></i> Gaming Hub
+                    </a>
+                    <a href="#" class="list-group-item list-group-item-action category-item">
+                        <i class="ri-palette-line me-2"></i> Creative Arts
+                    </a>
+                    <a href="#" class="list-group-item list-group-item-action category-item">
+                        <i class="ri-global-line me-2"></i> World News
+                    </a>
+                </div>
+                <hr class="my-4 text-muted opacity-25">
+                <button class="btn btn-primary w-100 rounded-pill fw-bold py-2">
+                    <i class="ri-add-circle-line me-1"></i> Create Group
+                </button>
+            </div>
+        </aside>
+
+        <div class="col-lg-9">
+            
+            <div class="d-flex justify-content-between align-items-end mb-4 px-2">
+                <div>
+                    <h4 class="fw-800 mb-0">Recommended Groups</h4>
+                    <p class="text-muted small mb-0">Based on your activity and interests</p>
+                </div>
+                <button class="btn btn-link text-decoration-none fw-bold small">Sort: Trending</button>
+            </div>
+
+            <div class="row g-4 mb-5">
+                <div class="col-md-6">
+                    <div class="card group-card shadow-sm h-100">
+                        <div style="height: 120px; background: url('https://picsum.photos/600/300?random=101') center/cover;"></div>
+                        <div class="card-body pt-0">
+                            <img src="https://picsum.photos/100/100?random=1" class="group-icon-container bg-white object-fit-cover">
+                            <div class="mt-3">
+                                <h5 class="fw-bold mb-1">Alpha Crypto Signals 🚀</h5>
+                                <p class="text-muted small">Daily signals and community trading strategies for monieFlow assets.</p>
+                                <div class="d-flex justify-content-between align-items-center mt-4">
+                                    <div class="avatar-group">
+                                        <img src="https://i.pravatar.cc/100?u=1">
+                                        <img src="https://i.pravatar.cc/100?u=2">
+                                        <img src="https://i.pravatar.cc/100?u=3">
+                                        <span class="small text-muted ms-2 fw-bold">12k+</span>
+                                    </div>
+                                    <button class="btn btn-outline-primary btn-sm rounded-pill px-4 fw-bold">Join</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-md-6">
+                    <div class="card group-card shadow-sm h-100">
+                        <div style="height: 120px; background: url('https://picsum.photos/600/300?random=102') center/cover;"></div>
+                        <div class="card-body pt-0">
+                            <img src="https://picsum.photos/100/100?random=2" class="group-icon-container bg-white object-fit-cover">
+                            <div class="mt-3">
+                                <h5 class="fw-bold mb-1">Pixel Art Studio 🎨</h5>
+                                <p class="text-muted small">Share your NFT designs and collaborate with global pixel artists.</p>
+                                <div class="d-flex justify-content-between align-items-center mt-4">
+                                    <div class="avatar-group">
+                                        <img src="https://i.pravatar.cc/100?u=4">
+                                        <img src="https://i.pravatar.cc/100?u=5">
+                                        <span class="small text-muted ms-2 fw-bold">3.5k+</span>
+                                    </div>
+                                    <button class="btn btn-outline-primary btn-sm rounded-pill px-4 fw-bold">Join</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <h5 class="fw-800 mb-4 px-2">Recently Active Groups</h5>
+            <div class="d-flex gap-3 overflow-auto pb-4 no-scrollbar">
+                <div class="text-center flex-shrink-0" style="width: 90px;">
+                    <img src="https://picsum.photos/80/80?random=11" class="rounded-circle border border-3 border-primary p-1 mb-2" width="75" height="75">
+                    <div class="small fw-bold text-truncate">Gaming</div>
+                </div>
+                <div class="text-center flex-shrink-0" style="width: 90px;">
+                    <img src="https://picsum.photos/80/80?random=12" class="rounded-circle border border-3 border-primary p-1 mb-2" width="75" height="75">
+                    <div class="small fw-bold text-truncate">Web3</div>
+                </div>
+                <div class="text-center flex-shrink-0" style="width: 90px;">
+                    <img src="https://picsum.photos/80/80?random=13" class="rounded-circle border border-3 border-primary p-1 mb-2" width="75" height="75">
+                    <div class="small fw-bold text-truncate">Music</div>
+                </div>
+                <div class="text-center flex-shrink-0" style="width: 90px;">
+                    <img src="https://picsum.photos/80/80?random=14" class="rounded-circle border border-3 border-primary p-1 mb-2" width="75" height="75">
+                    <div class="small fw-bold text-truncate">AI News</div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
