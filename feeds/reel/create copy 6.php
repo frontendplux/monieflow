@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Create Reel | monieFlow</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/remixicon@4.3.0/fonts/remixicon.css" rel="stylesheet">
@@ -20,18 +20,14 @@
             color: white;
             font-family: 'Segoe UI', sans-serif;
             overflow: hidden;
-            touch-action: manipulation;
         }
 
         video#cameraFeed {
             width: 100%;
             height: 100%;
             object-fit: cover;
-            object-position: center center;
             position: fixed;
-            inset: 0;
-            transform: translateZ(0);
-            z-index: 0;
+            top: 0; left: 0;
         }
 
         .viewfinder {
@@ -105,7 +101,6 @@
         }
 
         .record-btn-container {
-            position: relative;
             width: 90px; height: 90px;
             border-radius: 50%;
             border: 5px solid white;
@@ -127,26 +122,6 @@
             background: #ff3366;
         }
 
-        .record-spinner {
-            position: absolute;
-            inset: 4px;
-            border: 4px solid rgba(255,255,255,0.3);
-            border-top-color: white;
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-            opacity: 0;
-            transition: opacity 0.3s;
-            pointer-events: none;
-        }
-
-        .record-btn.recording + .record-spinner {
-            opacity: 1;
-        }
-
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
-
         .monie-settings {
             background: rgba(0,0,0,0.65);
             border-radius: 16px;
@@ -158,6 +133,7 @@
             border: 1px solid rgba(255,204,0,0.4);
         }
 
+        /* ── Bottom Sheet ────────────────────────────────────────────── */
         .bottom-sheet-backdrop {
             position: fixed;
             inset: 0;
@@ -181,7 +157,7 @@
             border-top-left-radius: 24px;
             border-top-right-radius: 24px;
             z-index: 19;
-            height: 48vh;
+            height: 42vh;
             transform: translateY(100%);
             transition: transform 0.42s cubic-bezier(0.32, 0.72, 0, 1);
             box-shadow: 0 -10px 40px rgba(0,0,0,0.6);
@@ -248,7 +224,7 @@
 </head>
 <body>
 
-    <video id="cameraFeed" autoplay playsinline muted></video>
+    <video id="cameraFeed" autoplay playsinline></video>
 
     <div class="viewfinder">
         <div class="top-nav">
@@ -290,7 +266,6 @@
 
                 <div class="record-btn-container" id="recordTrigger">
                     <div class="record-btn" id="recButton"></div>
-                    <div class="record-spinner"></div>
                 </div>
 
                 <div class="tool-btn" id="doneBtn">
@@ -330,7 +305,7 @@
     <script src="https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.10/dist/umd/ffmpeg.js"></script>
     <script>
         // ────────────────────────────────────────────────
-        //  MONIEFLOW REEL ENGINE - 20s duration + stable trim
+        //  MONIEFLOW REEL ENGINE - with working trim preview
         // ────────────────────────────────────────────────
 
         let stream = null;
@@ -338,13 +313,12 @@
         let recordedChunks = [];
         let isRecording = false;
         let facingMode = "user";
-        const maxDuration = 20;
+        const maxDuration = 15;
         let timer = null;
         const bgm = new Audio();
         let musicFile = null;
         let recordedBlob = null;
         let currentPreviewUrl = null;
-        let trimWatcher = null;
 
         const video = document.getElementById("cameraFeed");
         const recButton = document.getElementById("recButton");
@@ -357,6 +331,7 @@
         const videoVolume = document.getElementById("videoVolume");
         const musicVolume = document.getElementById("musicVolume");
 
+        // ── Helpers ─────────────────────────────────────────
         function revokeCurrentUrl() {
             if (currentPreviewUrl) {
                 URL.revokeObjectURL(currentPreviewUrl);
@@ -369,18 +344,18 @@
             document.getElementById("endVal").textContent   = Number(trimEnd.value).toFixed(1);
         }
 
+        // ── Camera ──────────────────────────────────────────
         async function startCamera() {
             try {
                 if (stream) stream.getTracks().forEach(t => t.stop());
                 stream = await navigator.mediaDevices.getUserMedia({
-                    video: { facingMode, width: { ideal: 1280 }, height: { ideal: 720 } },
+                    video: { facingMode },
                     audio: true
                 });
                 video.srcObject = stream;
                 video.muted = true;
-                video.playsInline = true;
             } catch (err) {
-                alert("Camera/mic access denied or not available");
+                alert("Camera/mic access denied");
                 console.error(err);
             }
         }
@@ -392,6 +367,7 @@
             startCamera();
         };
 
+        // ── Recording ───────────────────────────────────────
         recordTrigger.onclick = () => {
             if (!isRecording) startRecording();
             else stopRecording();
@@ -404,8 +380,8 @@
             recordedChunks = [];
             recordedBlob = null;
 
-            mediaRecorder = new MediaRecorder(stream, { mimeType: 'video/webm;codecs=vp9,opus' });
-            mediaRecorder.ondataavailable = e => { if (e.data.size > 0) recordedChunks.push(e.data); };
+            mediaRecorder = new MediaRecorder(stream);
+            mediaRecorder.ondataavailable = e => e.data.size > 0 && recordedChunks.push(e.data);
             mediaRecorder.onstop = onRecordingStopped;
 
             mediaRecorder.start();
@@ -416,7 +392,7 @@
             isRecording = false;
             recButton.classList.remove("recording");
             clearTimeout(timer);
-            if (mediaRecorder && mediaRecorder.state !== "inactive") mediaRecorder.stop();
+            if (mediaRecorder?.state !== "inactive") mediaRecorder.stop();
         }
 
         function onRecordingStopped() {
@@ -431,58 +407,60 @@
             video.controls = false;
             video.play().catch(() => {});
 
-            video.onloadedmetadata = () => {
-                initializeTrimSliders();
-                applyTrimPreview();
-            };
+            video.onloadedmetadata = initializeTrimSliders;
             showBottomSheet();
         }
 
         function initializeTrimSliders() {
-            const dur = isNaN(video.duration) ? maxDuration : video.duration;
+            const dur = video.duration || maxDuration;
             trimStart.max = dur;
-            trimEnd.max = dur;
+            trimEnd.max   = dur;
             trimStart.value = 0;
-            trimEnd.value = dur;
+            trimEnd.value   = dur;
             updateTrimDisplay();
+            applyTrimPreview();
         }
 
+        // ── Trim Preview (the main filter / working part) ───
         function applyTrimPreview() {
-            if (trimWatcher) clearInterval(trimWatcher);
-
             const start = Number(trimStart.value);
-            const end = Number(trimEnd.value);
-            if (end <= start + 0.2 || isNaN(video.duration)) return;
+            const end   = Number(trimEnd.value);
+
+            if (end <= start || isNaN(video.duration)) return;
 
             video.currentTime = start;
             video.play().catch(() => {});
 
-            trimWatcher = setInterval(() => {
-                if (video.currentTime >= end - 0.1) {
+            const checkTrim = setInterval(() => {
+                if (video.currentTime >= end || video.paused) {
                     video.currentTime = start;
                 }
-            }, 180);
+            }, 200);
+
+            // Clean up when sliders change or sheet closes
+            const cleanup = () => clearInterval(checkTrim);
+            trimStart.onchange = cleanup;
+            trimEnd.onchange   = cleanup;
+            video.onpause      = cleanup;
         }
 
-        function stopTrimPreview() {
-            if (trimWatcher) {
-                clearInterval(trimWatcher);
-                trimWatcher = null;
-            }
-            if (!video.loop) video.pause();
-        }
-
-        trimStart.oninput = trimEnd.oninput = () => {
+        trimStart.oninput = () => {
             updateTrimDisplay();
             applyTrimPreview();
         };
 
-        videoVolume.oninput = e => video.volume = Number(e.target.value);
-        musicVolume.oninput = e => bgm.volume = Number(e.target.value);
+        trimEnd.oninput = () => {
+            updateTrimDisplay();
+            applyTrimPreview();
+        };
 
+        videoVolume.oninput = e => video.volume = +e.target.value;
+        musicVolume.oninput = e => bgm.volume = +e.target.value;
+
+        // ── Upload ──────────────────────────────────────────
         document.getElementById("reelUpload").onchange = e => {
             const file = e.target.files?.[0];
-            if (!file || !file.type.startsWith("video/")) return;
+            if (!file?.type.startsWith("video/")) return;
 
             revokeCurrentUrl();
             currentPreviewUrl = URL.createObjectURL(file);
@@ -490,15 +468,13 @@
             video.src = currentPreviewUrl;
             video.muted = false;
             video.loop = true;
-            video.play().catch(() => {});
+            video.play();
 
-            video.onloadedmetadata = () => {
-                initializeTrimSliders();
-                applyTrimPreview();
-            };
+            video.onloadedmetadata = initializeTrimSliders;
             showBottomSheet();
         };
 
+        // ── Bottom Sheet Controls ───────────────────────────
         function showBottomSheet() {
             document.getElementById("bottomSheet").classList.add("active");
             document.getElementById("sheetBackdrop").classList.add("active");
@@ -507,15 +483,18 @@
         function hideBottomSheet() {
             document.getElementById("bottomSheet").classList.remove("active");
             document.getElementById("sheetBackdrop").classList.remove("active");
-            stopTrimPreview();
+            video.pause(); // optional: pause preview when closing
         }
 
         doneBtn.onclick = () => {
-            if (recordedBlob || currentPreviewUrl) showBottomSheet();
-            else alert("Record or upload something first");
+            if (recordedBlob || currentPreviewUrl) {
+                showBottomSheet();
+            } else {
+                alert("Record or upload something first");
+            }
         };
 
-        // FFmpeg part remains the same as before
+        // ── FFmpeg Export ───────────────────────────────────
         const { FFmpeg } = FFmpegWASM;
         let ffmpeg = null;
         let ffmpegReady = false;
@@ -593,11 +572,12 @@
                 video.play();
 
                 uploadToServer(finalBlob);
+
                 hideBottomSheet();
 
             } catch (err) {
-                console.error("Export failed:", err);
-                alert("Export failed – try a shorter clip or check storage");
+                console.error(err);
+                alert("Export failed – try shorter clip");
             }
         }
 
@@ -608,13 +588,13 @@
 
                 const res = await fetch("upload.php", { method: "POST", body: formData });
                 const msg = await res.text();
-                alert(res.ok ? `Uploaded! ${msg}` : "Upload failed – server error");
+                alert(res.ok ? `Uploaded! ${msg}` : "Upload failed");
             } catch (err) {
-                alert("Upload error – check internet connection");
+                alert("Upload error – check connection");
             }
         }
 
-        // Init defaults
+        // ── Init ────────────────────────────────────────────
         video.volume = 1;
         bgm.volume = 0.7;
     </script>
