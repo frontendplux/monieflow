@@ -136,6 +136,7 @@
             animation: spin 1s linear infinite;
             opacity: 0;
             transition: opacity 0.3s;
+            pointer-events: none;
         }
 
         .record-btn.recording + .record-spinner {
@@ -243,7 +244,6 @@
             border-color: rgba(255,255,255,0.4);
             color: white;
         }
-      
     </style>
 </head>
 <body>
@@ -301,11 +301,12 @@
         </div>
     </div>
 
+    <!-- Bottom Sheet -->
     <div class="bottom-sheet-backdrop" id="sheetBackdrop" onclick="hideBottomSheet()"></div>
 
     <div class="bottom-sheet" id="bottomSheet">
         <div class="sheet-handle"></div>
-        <div class="sheet-header">Edit Your Reel (exports as 15s)</div>
+        <div class="sheet-header">Edit Your Reel</div>
         <div class="sheet-content">
             <label>Trim Start: <span id="startVal">0.0</span>s</label>
             <input type="range" id="trimStart" min="0" value="0" step="0.1">
@@ -321,18 +322,23 @@
         </div>
         <div class="sheet-actions">
             <button class="btn btn-outline-light flex-grow-1 py-3" onclick="hideBottomSheet()">Cancel</button>
-            <button class="btn-mflow" onclick="exportFinalVideo()">Export & Upload (15s)</button>
+            <button class="btn-mflow" onclick="exportFinalVideo()">Export & Upload</button>
         </div>
     </div>
 
+    <!-- Scripts -->
     <script src="https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.10/dist/umd/ffmpeg.js"></script>
     <script>
+        // ────────────────────────────────────────────────
+        //  MONIEFLOW REEL ENGINE - 20s duration + stable trim
+        // ────────────────────────────────────────────────
+
         let stream = null;
         let mediaRecorder = null;
         let recordedChunks = [];
         let isRecording = false;
         let facingMode = "user";
-        const maxRecordDuration = 20;
+        const maxDuration = 20;
         let timer = null;
         const bgm = new Audio();
         let musicFile = null;
@@ -351,8 +357,6 @@
         const videoVolume = document.getElementById("videoVolume");
         const musicVolume = document.getElementById("musicVolume");
 
-        const FINAL_DURATION = 15;  // fixed 15 seconds output
-
         function revokeCurrentUrl() {
             if (currentPreviewUrl) {
                 URL.revokeObjectURL(currentPreviewUrl);
@@ -365,48 +369,21 @@
             document.getElementById("endVal").textContent   = Number(trimEnd.value).toFixed(1);
         }
 
-        // async function startCamera() {
-        //     try {
-        //         if (stream) stream.getTracks().forEach(t => t.stop());
-        //         stream = await navigator.mediaDevices.getUserMedia({
-        //             video: { facingMode, width: { ideal: 1280 }, height: { ideal: 720 } },
-        //             audio: true
-        //         });
-        //         video.srcObject = stream;
-        //         video.muted = true;
-        //         video.playsInline = true;
-        //     } catch (err) {
-        //         alert("Camera/mic access denied or not available");
-        //         console.error(err);
-        //     }
-        // }
-
-
         async function startCamera() {
-    try {
-        if (stream) stream.getTracks().forEach(t => t.stop());
-
-        stream = await navigator.mediaDevices.getUserMedia({
-            video: { facingMode, width: { ideal: 1280 }, height: { ideal: 720 } },
-            audio: true
-        });
-
-        video.srcObject = stream;
-        video.muted = true;
-        video.playsInline = true;
-
-        // Detect if front camera → decide mirroring
-        const track = stream.getVideoTracks()[0];
-        const settings = track.getSettings();
-        const isFront = settings.facingMode === 'user';   // or !settings.facingMode for fallback
-
-        video.style.transform = isFront ? 'scaleX(-1)' : 'scaleX(1)';
-        video.style.webkitTransform = isFront ? 'scaleX(-1)' : 'scaleX(1)';
-    } catch (err) {
-        alert("Camera/mic access denied or not available");
-        console.error(err);
-    }
-}
+            try {
+                if (stream) stream.getTracks().forEach(t => t.stop());
+                stream = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode, width: { ideal: 1280 }, height: { ideal: 720 } },
+                    audio: true
+                });
+                video.srcObject = stream;
+                video.muted = true;
+                video.playsInline = true;
+            } catch (err) {
+                alert("Camera/mic access denied or not available");
+                console.error(err);
+            }
+        }
 
         startCamera();
 
@@ -432,7 +409,7 @@
             mediaRecorder.onstop = onRecordingStopped;
 
             mediaRecorder.start();
-            timer = setTimeout(stopRecording, maxRecordDuration * 1000);
+            timer = setTimeout(stopRecording, maxDuration * 1000);
         }
 
         function stopRecording() {
@@ -462,11 +439,11 @@
         }
 
         function initializeTrimSliders() {
-            const dur = isNaN(video.duration) ? maxRecordDuration : video.duration;
+            const dur = isNaN(video.duration) ? maxDuration : video.duration;
             trimStart.max = dur;
             trimEnd.max = dur;
             trimStart.value = 0;
-            trimEnd.value = Math.min(FINAL_DURATION, dur);
+            trimEnd.value = dur;
             updateTrimDisplay();
         }
 
@@ -538,6 +515,7 @@
             else alert("Record or upload something first");
         };
 
+        // FFmpeg part remains the same as before
         const { FFmpeg } = FFmpegWASM;
         let ffmpeg = null;
         let ffmpegReady = false;
@@ -561,9 +539,11 @@
         async function exportFinalVideo() {
             if (!recordedBlob) return alert("No video to export");
 
-            const userStart = Number(trimStart.value);
-            const userEnd   = Number(trimEnd.value);
-            const userDur   = userEnd - userStart;
+            const start = Number(trimStart.value);
+            const end   = Number(trimEnd.value);
+            const dur   = end - start;
+
+            if (dur < 0.5) return alert("Trim too short");
 
             const vVol = Number(videoVolume.value);
             const mVol = Number(musicVolume.value);
@@ -577,7 +557,8 @@
                 await ffmpeg.writeFile("input.webm", await fetchFile(recordedBlob));
 
                 let cmd = [
-                    "-ss", userStart.toFixed(2),
+                    "-ss", start.toFixed(2),
+                    "-t",  dur.toFixed(2),
                     "-i", "input.webm"
                 ];
 
@@ -589,22 +570,10 @@
                     afilter = `[0:a]volume=${vVol},loudnorm[a0];[1:a]volume=${mVol},loudnorm[a1];[a0][a1]amix=inputs=2:duration=shortest[audio]`;
                 }
 
-                // Always output exactly 15s
-                // If userDur < 15 → freeze last frame with tpad
-                // If userDur > 15 → cut to 15s
-                const padFilter = userDur < FINAL_DURATION 
-                    ? `tpad=stop_mode=clone:stop_duration=${(FINAL_DURATION - userDur).toFixed(2)}` 
-                    : "";
-
-                const videoFilter = padFilter 
-                    ? `[0:v]${padFilter}[v]` 
-                    : "[0:v][v]";
-
                 cmd = cmd.concat([
-                    "-filter_complex", `${afilter};${videoFilter}`,
-                    "-map", "[v]",
+                    "-filter_complex", afilter,
+                    "-map", "0:v?",
                     "-map", "[audio]",
-                    "-t", FINAL_DURATION.toFixed(2),          // enforce max 15s
                     "-c:v", "libx264", "-preset", "veryfast", "-crf", "24",
                     "-c:a", "aac", "-b:a", "128k",
                     "-movflags", "+faststart",
@@ -628,7 +597,7 @@
 
             } catch (err) {
                 console.error("Export failed:", err);
-                alert("Export failed – try a shorter selection or check device storage");
+                alert("Export failed – try a shorter clip or check storage");
             }
         }
 
@@ -645,142 +614,7 @@
             }
         }
 
-        // Init
-        video.volume = 1;
-        bgm.volume = 0.7;
-    </script>
-    <script>
-        // ────────────────────────────────────────────────
-        //  MONIEFLOW REEL - 15s fixed + speed + filters + music
-        // ────────────────────────────────────────────────
-
-        const FINAL_DURATION = 15;
-        let currentSpeed = 1.0;
-        let currentFilter = "none";
-
-        // ... (keep all previous variables: stream, mediaRecorder, recordedBlob, etc.)
-
-        // ── Speed & Filter Handlers ───────────────────────────────
-        document.querySelectorAll('[data-speed]').forEach(btn => {
-            btn.onclick = () => {
-                document.querySelectorAll('[data-speed]').forEach(b => b.classList.remove('active'));
-                btn.classList.add('active');
-                currentSpeed = parseFloat(btn.dataset.speed);
-                video.playbackRate = currentSpeed;
-            };
-        });
-
-        document.querySelectorAll('[data-filter]').forEach(btn => {
-            btn.onclick = () => {
-                document.querySelectorAll('[data-filter]').forEach(b => b.classList.remove('active'));
-                btn.classList.add('active');
-                currentFilter = btn.dataset.filter;
-                applyFilter();
-            };
-        });
-
-        function applyFilter() {
-            video.style.filter = currentFilter;
-        }
-
-        // ── Music Upload ─────────────────────────────────────────────
-        document.getElementById("musicPicker").onclick = () => {
-            document.getElementById("musicUpload").click();
-        };
-
-        document.getElementById("musicUpload").onchange = e => {
-            const file = e.target.files[0];
-            if (!file || !file.type.startsWith("audio/")) return;
-
-            const url = URL.createObjectURL(file);
-            bgm.src = url;
-            bgm.loop = true;
-            musicFile = file;
-
-            if (!video.paused) {
-                bgm.currentTime = video.currentTime;
-                bgm.play().catch(() => {});
-            }
-
-            alert("Music added! Adjust volume in editor.");
-        };
-
-        // ── In preview functions (onRecordingStopped & upload onchange) ──
-        // Add this after video.play():
-        video.playbackRate = currentSpeed;
-        applyFilter();
-
-        // ── Export (with speed & filter applied via FFmpeg) ───────────
-        async function exportFinalVideo() {
-            if (!recordedBlob) return alert("No video recorded or uploaded");
-
-            const start = Number(trimStart.value);
-            let dur = FINAL_DURATION;
-
-            const vVol = Number(videoVolume.value);
-            const mVol = Number(musicVolume.value);
-
-            await loadFFmpeg();
-
-            try {
-                await ffmpeg.writeFile("input.webm", await fetchFile(recordedBlob));
-
-                let cmd = [
-                    "-ss", start.toFixed(2),
-                    "-i", "input.webm"
-                ];
-
-                let vfilter = "";
-                if (currentFilter !== "none") vfilter += currentFilter + ",";
-                vfilter += `setpts=${1/currentSpeed}*PTS`;  // speed adjustment
-
-                let afilter = `volume=${vVol},loudnorm=I=-16:TP=-1.5:LRA=11[audio]`;
-
-                if (musicFile) {
-                    await ffmpeg.writeFile("music.mp3", await fetchFile(musicFile));
-                    cmd.push("-i", "music.mp3");
-                    afilter = `[0:a]volume=${vVol},loudnorm[a0];[1:a]volume=${mVol},loudnorm[a1];[a0][a1]amix=inputs=2:duration=shortest[audio]`;
-                }
-
-                // Pad/freeze if needed
-                const pad = `tpad=stop_mode=clone:stop_duration=${dur.toFixed(2)}`;
-
-                cmd = cmd.concat([
-                    "-filter_complex", `[0:v]${vfilter}${pad}[v];${afilter}`,
-                    "-map", "[v]",
-                    "-map", "[audio]",
-                    "-t", dur.toFixed(2),
-                    "-c:v", "libx264", "-preset", "veryfast", "-crf", "23",
-                    "-c:a", "aac", "-b:a", "128k",
-                    "-movflags", "+faststart",
-                    "output.mp4"
-                ]);
-
-                await ffmpeg.exec(cmd);
-
-                const data = await ffmpeg.readFile("output.mp4");
-                const finalBlob = new Blob([data.buffer], { type: "video/mp4" });
-
-                // Preview result
-                revokeCurrentUrl();
-                currentPreviewUrl = URL.createObjectURL(finalBlob);
-                video.src = currentPreviewUrl;
-                video.loop = false;
-                video.controls = true;
-                video.play();
-
-                uploadToServer(finalBlob);
-                hideBottomSheet();
-
-            } catch (err) {
-                console.error(err);
-                alert("Export failed. Try shorter clip or check console.");
-            }
-        }
-
-        // ... keep all other functions (startCamera, recording, trim preview, uploadToServer, etc.) ...
-
-        // Init
+        // Init defaults
         video.volume = 1;
         bgm.volume = 0.7;
     </script>
