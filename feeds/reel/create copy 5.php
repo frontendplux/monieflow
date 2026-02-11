@@ -133,103 +133,40 @@
             border: 1px solid rgba(255,204,0,0.4);
         }
 
-        /* ── Bottom Sheet ────────────────────────────────────────────── */
-        .bottom-sheet-backdrop {
+        /* Editor panel (hidden by default) */
+        #editorPanel {
             position: fixed;
             inset: 0;
-            background: rgba(0,0,0,0.65);
-            z-index: 18;
-            opacity: 0;
-            pointer-events: none;
-            transition: opacity 0.4s ease;
-        }
-
-        .bottom-sheet-backdrop.active {
-            opacity: 1;
-            pointer-events: auto;
-        }
-
-        .bottom-sheet {
-            position: fixed;
-            bottom: 0; left: 0; right: 0;
-            background: rgba(18,18,23,0.98);
-            backdrop-filter: blur(12px);
-            border-top-left-radius: 24px;
-            border-top-right-radius: 24px;
-            z-index: 19;
-            height: 42vh;
-            transform: translateY(100%);
-            transition: transform 0.42s cubic-bezier(0.32, 0.72, 0, 1);
-            box-shadow: 0 -10px 40px rgba(0,0,0,0.6);
-            overflow: hidden;
-            display: flex;
+            background: rgba(0,0,0,0.9);
+            z-index: 20;
+            display: none;
             flex-direction: column;
-        }
-
-        .bottom-sheet.active {
-            transform: translateY(0);
-        }
-
-        .sheet-handle {
-            width: 42px;
-            height: 5px;
-            background: rgba(255,255,255,0.45);
-            border-radius: 999px;
-            margin: 14px auto 8px;
-        }
-
-        .sheet-header {
-            padding: 8px 20px 12px;
-            text-align: center;
-            font-weight: 600;
-            border-bottom: 1px solid rgba(255,255,255,0.08);
-        }
-
-        .sheet-content {
-            padding: 20px 24px;
-            flex: 1;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+            gap: 20px;
             overflow-y: auto;
         }
 
-        .sheet-content label {
-            display: block;
-            margin: 18px 0 8px;
-            font-size: 14px;
-            font-weight: 500;
-        }
-
-        .sheet-actions {
-            padding: 16px 24px;
-            border-top: 1px solid rgba(255,255,255,0.08);
-            display: flex;
-            gap: 12px;
-        }
-
-        .btn-mflow {
+        #editorPanel button {
+            padding: 12px 32px;
             background: var(--mflow-blue);
             border: none;
+            border-radius: 30px;
             color: white;
-            flex: 1;
-            border-radius: 50px;
-            padding: 14px;
-            font-weight: 600;
-            font-size: 15px;
-        }
-
-        .btn-outline-light {
-            border-color: rgba(255,255,255,0.4);
-            color: white;
+            font-weight: bold;
+            font-size: 16px;
         }
     </style>
 </head>
 <body>
 
-    <video id="cameraFeed" autoplay playsinline></video>
+    <video id="cameraFeed" autoplay playsinline muted></video>
 
     <div class="viewfinder">
         <div class="top-nav">
             <i class="ri-close-line fs-1" onclick="history.back()"></i>
-            <div class="music-picker" onclick="alert('Music selection coming soon')">
+            <div class="music-picker" onclick="alert('Music picker coming soon – upload your track!')">
                 <i class="ri-music-fill"></i> Add Sound
             </div>
             <i class="ri-settings-4-line fs-2"></i>
@@ -276,36 +213,31 @@
         </div>
     </div>
 
-    <!-- Bottom Sheet -->
-    <div class="bottom-sheet-backdrop" id="sheetBackdrop" onclick="hideBottomSheet()"></div>
+    <!-- Editor Panel -->
+    <div id="editorPanel">
+        <h4 class="mb-4">Edit Your Reel</h4>
 
-    <div class="bottom-sheet" id="bottomSheet">
-        <div class="sheet-handle"></div>
-        <div class="sheet-header">Edit Your Reel</div>
-        <div class="sheet-content">
-            <label>Trim Start: <span id="startVal">0.0</span>s</label>
-            <input type="range" id="trimStart" min="0" value="0" step="0.1">
+        <label>Trim Start: <span id="startVal">0</span>s</label>
+        <input type="range" id="trimStart" min="0" value="0" step="0.1">
 
-            <label>Trim End: <span id="endVal">10.0</span>s</label>
-            <input type="range" id="trimEnd" min="0" value="10" step="0.1">
+        <label>Trim End: <span id="endVal">10</span>s</label>
+        <input type="range" id="trimEnd" min="0" value="10" step="0.1">
 
-            <label>Video Volume</label>
-            <input type="range" id="videoVolume" min="0" max="1" step="0.05" value="1">
+        <label>Video Volume</label>
+        <input type="range" id="videoVolume" min="0" max="1" step="0.05" value="1">
 
-            <label>Music Volume</label>
-            <input type="range" id="musicVolume" min="0" max="1" step="0.05" value="0.7">
-        </div>
-        <div class="sheet-actions">
-            <button class="btn btn-outline-light flex-grow-1 py-3" onclick="hideBottomSheet()">Cancel</button>
-            <button class="btn-mflow" onclick="exportFinalVideo()">Export & Upload</button>
-        </div>
+        <label>Music Volume</label>
+        <input type="range" id="musicVolume" min="0" max="1" step="0.05" value="0.7">
+
+        <button onclick="exportFinalVideo()">Export & Upload Reel</button>
+        <button onclick="hideEditor()" class="btn btn-secondary mt-3">Cancel</button>
     </div>
 
     <!-- Scripts -->
     <script src="https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.10/dist/umd/ffmpeg.js"></script>
     <script>
         // ────────────────────────────────────────────────
-        //  MONIEFLOW REEL ENGINE - with working trim preview
+        //  MONIEFLOW REEL ENGINE – Integrated Version
         // ────────────────────────────────────────────────
 
         let stream = null;
@@ -313,41 +245,30 @@
         let recordedChunks = [];
         let isRecording = false;
         let facingMode = "user";
-        const maxDuration = 15;
+        const maxDuration = 15; // increased slightly – feel free to change
         let timer = null;
-        const bgm = new Audio();
+        const audio = new Audio();
         let musicFile = null;
         let recordedBlob = null;
-        let currentPreviewUrl = null;
 
         const video = document.getElementById("cameraFeed");
         const recButton = document.getElementById("recButton");
         const recordTrigger = document.getElementById("recordTrigger");
         const flipBtn = document.getElementById("flipBtn");
         const doneBtn = document.getElementById("doneBtn");
+        const editor = document.getElementById("editorPanel");
 
         const trimStart = document.getElementById("trimStart");
         const trimEnd   = document.getElementById("trimEnd");
         const videoVolume = document.getElementById("videoVolume");
         const musicVolume = document.getElementById("musicVolume");
 
-        // ── Helpers ─────────────────────────────────────────
-        function revokeCurrentUrl() {
-            if (currentPreviewUrl) {
-                URL.revokeObjectURL(currentPreviewUrl);
-                currentPreviewUrl = null;
-            }
-        }
-
-        function updateTrimDisplay() {
-            document.getElementById("startVal").textContent = Number(trimStart.value).toFixed(1);
-            document.getElementById("endVal").textContent   = Number(trimEnd.value).toFixed(1);
-        }
-
-        // ── Camera ──────────────────────────────────────────
+        // ── Init Camera ─────────────────────────────────────
         async function startCamera() {
             try {
-                if (stream) stream.getTracks().forEach(t => t.stop());
+                if (stream) {
+                    stream.getTracks().forEach(t => t.stop());
+                }
                 stream = await navigator.mediaDevices.getUserMedia({
                     video: { facingMode },
                     audio: true
@@ -355,34 +276,42 @@
                 video.srcObject = stream;
                 video.muted = true;
             } catch (err) {
-                alert("Camera/mic access denied");
+                alert("Camera or mic access denied.\nPlease allow in browser settings.");
                 console.error(err);
             }
         }
 
         startCamera();
 
+        // ── Flip Camera ─────────────────────────────────────
         flipBtn.onclick = () => {
             facingMode = facingMode === "user" ? "environment" : "user";
             startCamera();
         };
 
-        // ── Recording ───────────────────────────────────────
+        // ── Record Toggle ───────────────────────────────────
         recordTrigger.onclick = () => {
             if (!isRecording) startRecording();
             else stopRecording();
         };
 
         function startRecording() {
-            if (!stream) return;
+            if (!stream) return alert("Camera not ready");
             isRecording = true;
             recButton.classList.add("recording");
             recordedChunks = [];
             recordedBlob = null;
 
             mediaRecorder = new MediaRecorder(stream);
-            mediaRecorder.ondataavailable = e => e.data.size > 0 && recordedChunks.push(e.data);
-            mediaRecorder.onstop = onRecordingStopped;
+
+            mediaRecorder.ondataavailable = e => {
+                if (e.data.size > 0) recordedChunks.push(e.data);
+            };
+
+            mediaRecorder.onstop = () => {
+                previewRecording();
+                showEditor();
+            };
 
             mediaRecorder.start();
             timer = setTimeout(stopRecording, maxDuration * 1000);
@@ -395,106 +324,73 @@
             if (mediaRecorder?.state !== "inactive") mediaRecorder.stop();
         }
 
-        function onRecordingStopped() {
-            revokeCurrentUrl();
+        // ── Preview ─────────────────────────────────────────
+        function previewRecording() {
+            if (recordedChunks.length === 0) return;
+
+            if (video.src) URL.revokeObjectURL(video.src);
+
             recordedBlob = new Blob(recordedChunks, { type: "video/webm" });
-            currentPreviewUrl = URL.createObjectURL(recordedBlob);
+            const url = URL.createObjectURL(recordedBlob);
 
             video.srcObject = null;
-            video.src = currentPreviewUrl;
+            video.src = url;
             video.muted = false;
             video.loop = true;
             video.controls = false;
             video.play().catch(() => {});
 
-            video.onloadedmetadata = initializeTrimSliders;
-            showBottomSheet();
+            video.onloadedmetadata = () => {
+                const dur = video.duration || maxDuration;
+                trimStart.max = dur;
+                trimEnd.max   = dur;
+                trimStart.value = 0;
+                trimEnd.value   = dur;
+                document.getElementById("startVal").textContent = "0";
+                document.getElementById("endVal").textContent = dur.toFixed(1);
+            };
         }
 
-        function initializeTrimSliders() {
-            const dur = video.duration || maxDuration;
-            trimStart.max = dur;
-            trimEnd.max   = dur;
-            trimStart.value = 0;
-            trimEnd.value   = dur;
-            updateTrimDisplay();
-            applyTrimPreview();
-        }
-
-        // ── Trim Preview (the main filter / working part) ───
-        function applyTrimPreview() {
-            const start = Number(trimStart.value);
-            const end   = Number(trimEnd.value);
-
-            if (end <= start || isNaN(video.duration)) return;
-
-            video.currentTime = start;
-            video.play().catch(() => {});
-
-            const checkTrim = setInterval(() => {
-                if (video.currentTime >= end || video.paused) {
-                    video.currentTime = start;
-                }
-            }, 200);
-
-            // Clean up when sliders change or sheet closes
-            const cleanup = () => clearInterval(checkTrim);
-            trimStart.onchange = cleanup;
-            trimEnd.onchange   = cleanup;
-            video.onpause      = cleanup;
-        }
-
-        trimStart.oninput = () => {
-            updateTrimDisplay();
-            applyTrimPreview();
-        };
-
-        trimEnd.oninput = () => {
-            updateTrimDisplay();
-            applyTrimPreview();
-        };
-
+        // ── Volume Sliders ──────────────────────────────────
         videoVolume.oninput = e => video.volume = +e.target.value;
-        musicVolume.oninput = e => bgm.volume = +e.target.value;
+        musicVolume.oninput = e => audio.volume = +e.target.value;
 
-        // ── Upload ──────────────────────────────────────────
+        // ── Trim Display Update ─────────────────────────────
+        trimStart.oninput = () => document.getElementById("startVal").textContent = (+trimStart.value).toFixed(1);
+        trimEnd.oninput   = () => document.getElementById("endVal").textContent   = (+trimEnd.value).toFixed(1);
+
+        // ── Upload Video ────────────────────────────────────
         document.getElementById("reelUpload").onchange = e => {
-            const file = e.target.files?.[0];
+            const file = e.target.files[0];
             if (!file?.type.startsWith("video/")) return;
 
-            revokeCurrentUrl();
-            currentPreviewUrl = URL.createObjectURL(file);
+            if (video.src) URL.revokeObjectURL(video.src);
+
+            const url = URL.createObjectURL(file);
             video.srcObject = null;
-            video.src = currentPreviewUrl;
-            video.muted = false;
+            video.src = url;
             video.loop = true;
+            video.controls = false;
             video.play();
 
-            video.onloadedmetadata = initializeTrimSliders;
-            showBottomSheet();
+            video.onloadedmetadata = () => {
+                const dur = video.duration;
+                trimStart.max = dur;
+                trimEnd.max   = dur;
+                trimStart.value = 0;
+                trimEnd.value   = dur;
+                document.getElementById("startVal").textContent = "0";
+                document.getElementById("endVal").textContent = dur.toFixed(1);
+            };
+
+            showEditor();
         };
 
-        // ── Bottom Sheet Controls ───────────────────────────
-        function showBottomSheet() {
-            document.getElementById("bottomSheet").classList.add("active");
-            document.getElementById("sheetBackdrop").classList.add("active");
-        }
+        // ── Editor Show/Hide ────────────────────────────────
+        function showEditor() { editor.style.display = "flex"; }
+        function hideEditor() { editor.style.display = "none"; }
 
-        function hideBottomSheet() {
-            document.getElementById("bottomSheet").classList.remove("active");
-            document.getElementById("sheetBackdrop").classList.remove("active");
-            video.pause(); // optional: pause preview when closing
-        }
-
-        doneBtn.onclick = () => {
-            if (recordedBlob || currentPreviewUrl) {
-                showBottomSheet();
-            } else {
-                alert("Record or upload something first");
-            }
-        };
-
-        // ── FFmpeg Export ───────────────────────────────────
+        // ── FFmpeg (load once) ──────────────────────────────
         const { FFmpeg } = FFmpegWASM;
         let ffmpeg = null;
         let ffmpegReady = false;
@@ -504,30 +400,33 @@
             try {
                 ffmpeg = new FFmpeg();
                 await ffmpeg.load({
-                    coreURL: "https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.10/dist/umd/ffmpeg-core.js"
+                    coreURL: "https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.10/dist/umd/ffmpeg-core.js",
                 });
                 ffmpegReady = true;
             } catch (err) {
-                alert("Video processor failed to load");
-                console.error(err);
+                console.error("FFmpeg failed to load", err);
+                alert("Video processor failed to load.\nCheck internet or try again later.");
             }
         }
 
+        // Preload on first interaction
         recordTrigger.addEventListener("click", loadFFmpeg, { once: true });
 
+        // ── Export Final Video ──────────────────────────────
         async function exportFinalVideo() {
             if (!recordedBlob) return alert("No video to export");
 
-            const start = Number(trimStart.value);
-            const end   = Number(trimEnd.value);
+            const start = +trimStart.value;
+            const end   = +trimEnd.value;
             const dur   = end - start;
 
-            if (dur < 0.5) return alert("Trim too short");
+            if (dur <= 0.5) return alert("Trim too short");
 
-            const vVol = Number(videoVolume.value);
-            const mVol = Number(musicVolume.value);
+            const vVol = +videoVolume.value;
+            const mVol = +musicVolume.value;
 
             if (!ffmpegReady) {
+                alert("Preparing video tools... please wait 10–30 seconds");
                 await loadFFmpeg();
                 if (!ffmpegReady) return;
             }
@@ -537,20 +436,20 @@
 
                 let cmd = [
                     "-ss", start.toFixed(2),
-                    "-t",  dur.toFixed(2),
-                    "-i", "input.webm"
+                    "-t", dur.toFixed(2),
+                    "-i", "input.webm",
                 ];
 
-                let afilter = `volume=${vVol},loudnorm=I=-16:TP=-1.5:LRA=11[audio]`;
+                let filter = `volume=${vVol},loudnorm=I=-16:TP=-1.5:LRA=11[audio]`;
 
                 if (musicFile) {
-                    await ffmpeg.writeFile("bgm.mp3", await fetchFile(musicFile));
-                    cmd.push("-i", "bgm.mp3");
-                    afilter = `[0:a]volume=${vVol},loudnorm[a0];[1:a]volume=${mVol},loudnorm[a1];[a0][a1]amix=inputs=2:duration=shortest[audio]`;
+                    await ffmpeg.writeFile("music.mp3", await fetchFile(musicFile));
+                    cmd.push("-i", "music.mp3");
+                    filter = `[0:a]volume=${vVol},loudnorm=I=-16[a0];[1:a]volume=${mVol},loudnorm=I=-16[a1];[a0][a1]amix=inputs=2:duration=shortest[audio]`;
                 }
 
                 cmd = cmd.concat([
-                    "-filter_complex", afilter,
+                    "-filter_complex", filter,
                     "-map", "0:v?",
                     "-map", "[audio]",
                     "-c:v", "libx264", "-preset", "veryfast", "-crf", "24",
@@ -564,39 +463,43 @@
                 const data = await ffmpeg.readFile("output.mp4");
                 const finalBlob = new Blob([data.buffer], { type: "video/mp4" });
 
-                revokeCurrentUrl();
-                currentPreviewUrl = URL.createObjectURL(finalBlob);
-                video.src = currentPreviewUrl;
+                // Preview result
+                if (video.src) URL.revokeObjectURL(video.src);
+                video.src = URL.createObjectURL(finalBlob);
                 video.loop = false;
                 video.controls = true;
                 video.play();
 
+                // Upload
                 uploadToServer(finalBlob);
-
-                hideBottomSheet();
 
             } catch (err) {
                 console.error(err);
-                alert("Export failed – try shorter clip");
+                alert("Processing failed – file may be too large or device too slow.");
             }
         }
 
+        // ── Upload to PHP ───────────────────────────────────
         async function uploadToServer(blob) {
             try {
                 const formData = new FormData();
-                formData.append("video", blob, "reel-" + Date.now() + ".mp4");
+                formData.append("video", blob, "monieflow-reel.mp4");
 
                 const res = await fetch("upload.php", { method: "POST", body: formData });
-                const msg = await res.text();
-                alert(res.ok ? `Uploaded! ${msg}` : "Upload failed");
+                const text = await res.text();
+
+                alert(res.ok ? `Uploaded! Server says: ${text}` : "Upload failed – check server");
             } catch (err) {
-                alert("Upload error – check connection");
+                alert("Upload error – check internet connection");
+                console.error(err);
             }
         }
 
-        // ── Init ────────────────────────────────────────────
-        video.volume = 1;
-        bgm.volume = 0.7;
+        // ── Done Button ─────────────────────────────────────
+        doneBtn.onclick = exportFinalVideo;
+
+        // Optional: Add music upload later (e.g. via hidden input)
+        // document.querySelector(".music-picker").onclick = () => { ... }
     </script>
 </body>
 </html>
