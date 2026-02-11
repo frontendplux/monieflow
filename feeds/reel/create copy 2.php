@@ -128,8 +128,7 @@
 </head>
 <body>
 
-    <video id="cameraFeed" autoplay playsinline loop style="width:100%; position: fixed; height: 100%;"></video>
-
+    <div style="background: #1a1a1a; height: 100%; width: 100%;" id="cameraFeed"></div>
 
     <div class="viewfinder">
         <div class="top-nav">
@@ -184,175 +183,26 @@
 
 
     <script>
-        /* ===============================
-   MONIEFLOW REEL ENGINE
-================================ */
-
-let stream;
-let mediaRecorder;
-let recordedChunks = [];
-let isRecording = false;
-let facingMode = "user";
-let maxDuration = 10; // 10 seconds only
-let timer;
-let audio = new Audio();
-let musicFile = null;
-
-const video = document.getElementById("cameraFeed");
-const recButton = document.getElementById("recButton");
-
-/* ===============================
-   INIT CAMERA
-================================ */
-async function startCamera() {
-    try {
-        if (stream) {
-            stream.getTracks().forEach(track => track.stop());
+        let isRecording = false;
+        function toggleRecord() {
+            const btn = document.getElementById('recButton');
+            isRecording = !isRecording;
+            
+            if(isRecording) {
+                btn.classList.add('recording');
+                // Start a timer logic here
+            } else {
+                btn.classList.remove('recording');
+            }
         }
-
-        stream = await navigator.mediaDevices.getUserMedia({
-            video: { facingMode: facingMode },
-            audio: true
-        });
-
-        video.srcObject = stream;
-        video.controls = false;
-
-    } catch (err) {
-        alert("Camera access denied or not supported.");
-        console.error(err);
-    }
-}
-
-startCamera();
-
-/* ===============================
-   FLIP CAMERA
-================================ */
-document.querySelector(".ri-repeat-line").parentElement.onclick = function () {
-    facingMode = facingMode === "user" ? "environment" : "user";
-    startCamera();
-};
-
-/* ===============================
-   RECORD
-================================ */
-function toggleRecord() {
-    if (!isRecording) {
-        startRecording();
+        document.getElementById("reelUpload").addEventListener("change", function(event) {
+    const file = event.target.files[0];
+    if (file) {
+        console.log("File selected:", file.name);
+        // Next step: preview or upload to server
     } else {
-        stopRecording();
+        console.log("No file selected");
     }
-}
-
-function startRecording() {
-
-    if (!stream) return;
-
-    isRecording = true;
-    recButton.classList.add("recording");
-    recordedChunks = [];
-
-    mediaRecorder = new MediaRecorder(stream);
-
-    mediaRecorder.ondataavailable = e => {
-        if (e.data.size > 0) recordedChunks.push(e.data);
-    };
-
-    mediaRecorder.onstop = () => {
-        previewRecording();
-    };
-
-    mediaRecorder.start();
-
-    // AUTO STOP AT 10s
-    timer = setTimeout(() => {
-        stopRecording();
-    }, maxDuration * 1000);
-}
-
-function stopRecording() {
-    isRecording = false;
-    recButton.classList.remove("recording");
-    clearTimeout(timer);
-
-    if (mediaRecorder && mediaRecorder.state !== "inactive") {
-        mediaRecorder.stop();
-    }
-}
-
-/* ===============================
-   PREVIEW (NO CONTROLS)
-================================ */
-function previewRecording() {
-    const blob = new Blob(recordedChunks, { type: "video/webm" });
-    const url = URL.createObjectURL(blob);
-
-    video.srcObject = null;
-    video.src = url;
-    video.controls = false;
-    video.loop = true;
-    video.play();
-
-    if (musicFile) {
-        audio.currentTime = 0;
-        audio.play();
-    }
-}
-
-/* ===============================
-   TRIM VIDEO
-================================ */
-function trimVideo(start, end) {
-    if (!video.duration) return;
-
-    video.currentTime = start;
-
-    video.ontimeupdate = function () {
-        if (video.currentTime >= end) {
-            video.pause();
-        }
-    };
-}
-
-/* Example usage:
-   trimVideo(2, 7);  // trims from 2s to 7s
-*/
-
-/* ===============================
-   ADD MUSIC
-================================ */
-function addMusic(file) {
-    musicFile = file;
-    const url = URL.createObjectURL(file);
-    audio.src = url;
-    audio.loop = true;
-}
-
-/* ===============================
-   REMOVE MUSIC
-================================ */
-function removeMusic() {
-    audio.pause();
-    audio.src = "";
-    musicFile = null;
-}
-
-/* ===============================
-   UPLOAD VIDEO FROM DEVICE
-================================ */
-document.getElementById("reelUpload").addEventListener("change", function (e) {
-
-    const file = e.target.files[0];
-    if (!file) return;
-
-    const url = URL.createObjectURL(file);
-
-    video.srcObject = null;
-    video.src = url;
-    video.controls = false;
-    video.loop = true;
-    video.play();
 });
 
     </script>
