@@ -1,9 +1,16 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    <?php include __DIR__."/../main-function.php"; ?>
+    <?php 
+        $main = new main($conn);
+        if($main->isLoggedIn() === false) header('location:/');
+        $userData = $main->getUserData()['data'];
+        $profile = json_decode($userData['profile'], true);
+    ?>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Profile | Facebook Style</title>
+    <title>monieflow | Facebook Style</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/remixicon@3.5.0/fonts/remixicon.css" rel="stylesheet">
     <style>
@@ -103,24 +110,28 @@
     </style>
 </head>
 <body>
-
 <div class="fb-header-container mb-4">
-    <div class="container px-0 px-md-5">
+    <div class="position-fixed w-100 top-0 p-2" style="z-index: 23390; background: #f0f8ffab;">
+        <div class="container d-flex justify-content-between px-5" >
+            <a href="javascript:;" onclick="history.back()" class="ri-arrow-left-s-line text-decoration-none fs-3 text-dark"></a>
+        </div>
+    </div>
+    <div class="container px-0 px-md-5" style="margin-top: 59px;">
         <img src="https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=1200&q=80" class="fb-cover" alt="Cover">
         <div class="d-md-flex text-center text-md-start align-items-end fb-profile-bottom px-4">
-            <img src="https://i.pravatar.cc/170?u=me" class="fb-avatar me-3 shadow-sm" alt="Avatar">
+            <img src="/uploads/<?= $profile['profile_pic'] ?>" class="fb-avatar me-3 shadow-sm" alt="Avatar">
             <div class="mb-2">
-                <h1 class="fw-bold mb-0">John Doe</h1>
+                <h1 class="fw-bold mb-0 fs-5"><?= $profile['first_name'] ?> <?= $profile['last_name'] ?></h1>
                 <p class="text-secondary fw-bold"><span>1.2K Follower</span>  <span class="ms-2">1.2K Following</span></p>
             </div>
             <div class="ms-auto mb-3">
-                <button class="btn btn-primary fw-bold px-3"><i class="ri-add-line"></i> Add to Story</button>
-                <button class="btn btn-light fw-bold px-3 ms-2"><i class="ri-pencil-fill"></i> Edit Profile</button>
+                <a href="/feeds/create.php" class="btn btn-primary fw-bold px-3"><i class="ri-add-line"></i> Add to Story</a>
+                <button onclick="window.location.href=window.innerWidth <= 768 ? '/profile/menu.php' : '/profile/settings/edit-profile.php';" class="btn btn-light fw-bold px-3 ms-2"><i class="ri-pencil-fill"></i> Edit Profile</a>
             </div>
         </div>
         <div class="fb-tabs mt-2 px-4">
             <a href="#" class="fb-tab-item active">Posts</a>
-            <a href="#" class="fb-tab-item">About</a>
+            <a href="#" class="fb-tab-item">Pages</a>
             <a href="#" class="fb-tab-item">Friends</a>
             <a href="#" class="fb-tab-item">Photos</a>
             <a href="#" class="fb-tab-item">Videos</a>
@@ -134,7 +145,7 @@
             <div class="fb-card">
                 <h5 class="fw-bold">Intro</h5>
                 <p class="text-center py-2">Software Engineer at TechCorp. Lover of pizza and clean code. 🍕💻</p>
-                <button class="btn btn-light w-100 fw-bold mb-3">Edit Bio</button>
+                <a href="/profile/settings/edit-profile.php" class="btn btn-light w-100 fw-bold mb-3">Edit Bio</a>
                 <div class="small text-secondary">
                     <div class="mb-2"><i class="ri-briefcase-fill me-2"></i> Works at <b>TechCorp</b></div>
                     <div class="mb-2"><i class="ri-map-pin-2-fill me-2"></i> From <b>New York, NY</b></div>
@@ -145,10 +156,10 @@
 
         <div class="col-lg-7">
             <div class="fb-card d-flex gap-2 align-items-center">
-                <img src="https://i.pravatar.cc/40?u=me" class="rounded-circle" width="40" height="40">
-                <div class="create-post-input" data-bs-toggle="modal" data-bs-target="#createPostModal">
-                    What's on your mind, John?
-                </div>
+                  <a href="/profile/"><img src="/uploads/<?= $profile['profile_pic'] ?>" class="rounded-circle me-2" width="40" height="40" style="object-fit: cover;" /></a>
+                    <a href="/feeds/create.php" class="composer-input text-decoration-none create-post-input">
+                        What's on your mind, <?= $profile['username'] ?>?
+                    </a>
             </div>
 
             <div class="fb-card">
@@ -166,6 +177,112 @@
                     <button class="btn btn-light flex-grow-1 text-secondary fw-bold"><i class="ri-share-forward-line"></i> Share</button>
                 </div>
             </div>
+
+            <div class="card border-0 shadow-sm rounded-4 overflow-hidden">
+    <div class="card-body p-4">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <div>
+                <h4 class="fw-bold mb-0">Photo Gallery</h4>
+                <p class="text-muted small mb-0">Manage your public and exclusive media.</p>
+            </div>
+            <div class="d-flex gap-2">
+                <button class="btn btn-light rounded-pill btn-sm border px-3">
+                    <i class="ri-settings-3-line"></i>
+                </button>
+                <button class="btn btn-primary rounded-pill btn-sm fw-bold px-3">
+                    <i class="ri-add-line me-1"></i> Upload
+                </button>
+            </div>
+        </div>
+
+        <ul class="nav nav-pills nav-fill bg-light rounded-pill p-1 mb-4" id="galleryTab" role="tablist">
+            <li class="nav-item">
+                <button class="nav-link active rounded-pill py-2 small fw-bold" data-bs-toggle="pill">Public</button>
+            </li>
+            <li class="nav-item">
+                <button class="nav-link rounded-pill py-2 small fw-bold" data-bs-toggle="pill">
+                    <i class="ri-lock-2-line me-1"></i>Exclusive
+                </button>
+            </li>
+        </ul>
+
+        <div class="row g-2">
+            <div class="col-4 col-md-3">
+                <div class="ratio ratio-1x1 rounded-3 overflow-hidden position-relative group-hover">
+                    <img src="https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&q=80&w=400" 
+                         class="object-fit-cover w-100 h-100" alt="Gallery image">
+                    <div class="position-absolute top-0 end-0 p-1">
+                        <span class="badge bg-dark bg-opacity-50 small"><i class="ri-eye-line"></i> 1.2k</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-4 col-md-3">
+                <div class="ratio ratio-1x1 rounded-3 overflow-hidden position-relative">
+                    <img src="https://images.unsplash.com/photo-1536440136628-849c177e76a1?auto=format&fit=crop&q=80&w=400" 
+                         class="object-fit-cover w-100 h-100" alt="Video thumb">
+                    <div class="position-absolute top-50 start-50 translate-middle">
+                        <i class="ri-play-circle-fill text-white fs-2 opacity-75"></i>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-4 col-md-3">
+                <div class="ratio ratio-1x1 rounded-3 overflow-hidden position-relative">
+                    <img src="https://images.unsplash.com/photo-1550684848-fac1c5b4e853?auto=format&fit=crop&q=80&w=400" 
+                         class="object-fit-cover w-100 h-100 blur-image" alt="Exclusive">
+                    <div class="position-absolute top-0 start-0 w-100 h-100 bg-dark bg-opacity-25 d-flex align-items-center justify-content-center">
+                        <i class="ri-lock-fill text-white fs-3"></i>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-4 col-md-3">
+                <div class="ratio ratio-1x1 rounded-3 overflow-hidden">
+                    <img src="https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&q=80&w=400" class="object-fit-cover w-100 h-100">
+                </div>
+            </div>
+            <div class="col-4 col-md-3">
+                <div class="ratio ratio-1x1 rounded-3 overflow-hidden">
+                    <img src="https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?auto=format&fit=crop&q=80&w=400" class="object-fit-cover w-100 h-100">
+                </div>
+            </div>
+            
+            <div class="col-4 col-md-3">
+                <a href="#" class="ratio ratio-1x1 rounded-3 border border-dashed d-flex align-items-center justify-content-center text-decoration-none bg-light hover-bg">
+                    <div class="text-center text-muted">
+                        <i class="ri-add-line fs-3"></i>
+                        <div style="font-size: 0.65rem;">Add More</div>
+                    </div>
+                </a>
+            </div>
+        </div>
+
+        <div class="mt-4 p-3 bg-light rounded-4">
+            <div class="row text-center">
+                <div class="col-4 border-end">
+                    <div class="fw-bold mb-0">128</div>
+                    <div class="small text-muted">Photos</div>
+                </div>
+                <div class="col-4 border-end">
+                    <div class="fw-bold mb-0">12GB</div>
+                    <div class="small text-muted">Used</div>
+                </div>
+                <div class="col-4">
+                    <div class="fw-bold mb-0">4.5k</div>
+                    <div class="small text-muted">Likes</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .blur-image { filter: blur(8px); }
+    .object-fit-cover { object-fit: cover; }
+    .border-dashed { border-style: dashed !important; border-width: 2px !important; }
+    .hover-bg:hover { background: #eef2ff !important; transition: 0.3s; }
+</style>
         </div>
     </div>
 </div>

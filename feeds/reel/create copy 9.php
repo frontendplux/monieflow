@@ -252,10 +252,10 @@
 
     <div class="viewfinder">
         <div class="top-nav">
-            <i class="ri-arrow-right-s-line fs-1" onclick="history.back()"></i>
-            <div class="music-picker" onclick="alert('Music selection coming soon')">
+            <i class="ri-arrow-left-s-line fs-1" onclick="history.back()"></i>
+            <!-- <div class="music-picker" onclick="alert('Music selection coming soon')">
                 <i class="ri-music-fill"></i> Add Sound
-            </div>
+            </div> -->
             <div></div>
             <!-- <i onclick="alert('yes')" class="ri-settings-4-line fs-2"></i> -->
         </div>

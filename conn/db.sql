@@ -1,22 +1,9 @@
-/* DROP TABLE if EXISTS users;
-DROP TABLE if EXISTS events_triger; */
-/* DROP TABLE if EXISTS likes;
-DROP TABLE if EXISTS comments;
-DROP TABLE if EXISTS comments_lyk; */
 CREATE TABLE IF NOT EXISTS users (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
-    uid  VARCHAR(305) NOT NULL,
-    email VARCHAR(300) NOT NULL ,
+    uid VARCHAR(305) NOT NULL,
+    email VARCHAR(300) NOT NULL,
     password VARCHAR(305) NOT NULL,
-    profile json DEFAULT '{}',
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-);
-
-CREATE TABLE IF NOT EXISTS reels (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY,
-    user_id BIGINT NOT NULL,
-    data json DEFAULT '{}',
+    profile JSON DEFAULT '{}',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
@@ -24,10 +11,8 @@ CREATE TABLE IF NOT EXISTS reels (
 CREATE TABLE IF NOT EXISTS feeds (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     user_id BIGINT NOT NULL,
-    images JSON DEFAULT NULL,         -- store array of image filenames
-    audio VARCHAR(255) DEFAULT '',    -- single audio filename
-    video VARCHAR(255) DEFAULT '',    -- single video filename
-    text TEXT NOT NULL,               -- post text
+    data JSON DEFAULT '{}',
+    status VARCHAR(100) NOT NULL, -- feed, reel, market, groups, pages, ...
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
@@ -36,38 +21,20 @@ CREATE TABLE IF NOT EXISTS likes (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     feed_id BIGINT NOT NULL,
     user_id BIGINT NOT NULL,
-    parent_id int not null,
+    parent_id INT NOT NULL,
+    data JSON DEFAULT '{}',
+    status VARCHAR(100) DEFAULT 'feed', -- feed, reel, groups, pages, ...
+    type VARCHAR(100) DEFAULT 'post',   -- comment, post
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE IF NOT EXISTS comments (
+CREATE TABLE IF NOT EXISTS events_trigger (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
-    feed_id BIGINT NOT NULL,
-    user_id BIGINT NOT NULL,
-    parent_id int not null,
-    comment_text TEXT NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
-
-CREATE TABLE IF NOT EXISTS comments_lyk (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY,
-    feed_id BIGINT NOT NULL,
-    user_id BIGINT NOT NULL,
-    parent_id int not null,
-    comment_text TEXT NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
-
-CREATE TABLE IF NOT EXISTS events_triger (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY,
-    event_type ENUM('like','comment','share','follow','message','notification') DEFAULT 'like',
+    event_type VARCHAR(100) DEFAULT 'like', -- 'like','comment','share','follow','message','notification',...
     data JSON DEFAULT '{}',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
 
-DELETE FROM events_triger 
+DELETE FROM events_trigger 
 WHERE created_at < (NOW() - INTERVAL 25 MINUTE);
-

@@ -1,0 +1,24 @@
+In CSS frameworks like **Bootstrap**, the `sm` breakpoint refers to **small devices** (typically smartphones). The width in pixels for `sm` is:
+
+- **`sm` = 576px and up**
+
+That means:
+- Anything **below 576px** is considered **extra small (xs)**.
+- At **576px and above**, the layout switches to the `sm` breakpoint rules.
+
+Here’s a quick reference table for Bootstrap breakpoints:
+
+| Breakpoint | Prefix | Min Width (px) |
+|------------|--------|----------------|
+| Extra small | `xs` | `<576` |
+| Small | `sm` | `≥576` |
+| Medium | `md` | `≥768` |
+| Large | `lg` | `≥992` |
+| Extra large | `xl` | `≥1200` |
+| Extra extra large | `xxl` | `≥1400` |
+
+So when you see `sm`, think **576px minimum width**.  
+
+Since you’re working on your **monieflow project** in phpMyAdmin and a Facebook-style UI, this breakpoint will control how your feeds/reels layout adapts on mobile screens.  
+
+Would you like me to show you a **responsive grid example** using `sm`, `md`, and `lg` so you can see how your feeds table could look across devices?

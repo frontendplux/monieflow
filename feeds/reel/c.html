@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hold to Record - 15 Min Max</title>
+    <style>
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #0f0f0f;
+            font-family: sans-serif;
+            color: white;
+            user-select: none; /* Prevents text selection while holding */
+        }
+
+        .container { text-align: center; }
+
+        .record-container {
+            position: relative;
+            width: 160px;
+            height: 160px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            margin: 0 auto;
+            border-radius: 50%;
+        }
+
+        .progress-ring {
+            position: absolute;
+            transform: rotate(-90deg);
+        }
+
+        .progress-ring__circle {
+            transition: stroke-dashoffset 0.1s linear;
+            stroke-linecap: round;
+        }
+
+        .inner-circle {
+            width: 90px;
+            height: 90px;
+            background-color: #ff3b30;
+            border-radius: 50%;
+            transition: all 0.2s ease;
+            z-index: 2;
+        }
+
+        /* Active State */
+        .holding .inner-circle {
+            transform: scale(0.8);
+            border-radius: 15px;
+        }
+
+        #timer {
+            margin-top: 20px;
+            font-size: 2rem;
+            font-family: monospace;
+        }
+
+        .hint {
+            margin-top: 10px;
+            color: #666;
+            font-size: 0.9rem;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div id="recordBtn" class="record-container">
+        <svg class="progress-ring" width="160" height="160">
+            <circle stroke="#333" stroke-width="10" fill="transparent" r="70" cx="80" cy="80"/>
+            <circle id="progressBar" class="progress-ring__circle" stroke="#ff3b30" stroke-width="10" fill="transparent" r="70" cx="80" cy="80"/>
+        </svg>
+        <div class="inner-circle"></div>
+    </div>
+    
+    <div id="timer">00:00</div>
+    <div class="hint" id="status">Hold to record (min 5s)</div>
+</div>
+
+<script>
+    const btn = document.getElementById('recordBtn');
+    const progressBar = document.getElementById('progressBar');
+    const timerDisplay = document.getElementById('timer');
+    const statusText = document.getElementById('status');
+
+    const radius = progressBar.r.baseVal.value;
+    const circumference = 2 * Math.PI * radius;
+    progressBar.style.strokeDasharray = `${circumference} ${circumference}`;
+    progressBar.style.strokeDashoffset = circumference;
+
+    let startTime;
+    let timerInterval;
+    const maxSeconds = 900; // 15 mins
+    const minRequiredSeconds = 5;
+
+    function formatTime(s) {
+        const mins = Math.floor(s / 60).toString().padStart(2, '0');
+        const secs = (s % 60).toString().padStart(2, '0');
+        return `${mins}:${secs}`;
+    }
+
+    function startRecording() {
+        startTime = Date.now();
+        btn.classList.add('holding');
+        statusText.innerText = "Recording...";
+        
+        timerInterval = setInterval(() => {
+            const elapsed = Math.floor((Date.now() - startTime) / 1000);
+            
+            // Update UI
+            timerDisplay.innerText = formatTime(elapsed);
+            const offset = circumference - (elapsed / maxSeconds) * circumference;
+            progressBar.style.strokeDashoffset = Math.max(0, offset);
+
+            if (elapsed >= maxSeconds) {
+                stopRecording();
+            }
+        }, 100);
+    }
+
+    function stopRecording() {
+        const elapsed = (Date.now() - startTime) / 1000;
+        clearInterval(timerInterval);
+        btn.classList.remove('holding');
+
+        if (elapsed < minRequiredSeconds) {
+            statusText.innerText = "Too short! Hold for 5s.";
+            // Reset UI
+            timerDisplay.innerText = "00:00";
+            progressBar.style.strokeDashoffset = circumference;
+        } else {
+            statusText.innerText = `Saved: ${formatTime(Math.floor(elapsed))}`;
+        }
+    }
+
+    // Mouse Events
+    btn.addEventListener('mousedown', startRecording);
+    window.addEventListener('mouseup', () => {
+        if (startTime) stopRecording();
+        startTime = null;
+    });
+
+    // Touch Events (for Mobile)
+    btn.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        startRecording();
+    });
+    btn.addEventListener('touchend', () => {
+        if (startTime) stopRecording();
+        startTime = null;
+    });
+
+</script>
+</body>
+</html>

@@ -2,7 +2,7 @@
     define('db_host', 'localhost');
     define('db_user', 'root');
     define('db_pass', '');
-    define('db_name', 'monieflow');
+    define('db_name', 'monieflow2');
 $host = $_SERVER['HTTP_HOST'];
 // Local settings
 if (in_array($host, ['localhost:3000', '127.0.0.1:3000', '192.168.8.129:3000', '172.20.10.10:3000','172.20.10.4:3000','192.168.8.110:3000'])) {
