@@ -12,7 +12,7 @@ function droppySammy(type, header, message) {
         style.innerHTML = `
             #droppy-container {
                 position: fixed; top: 20px; left: 50%; transform: translateX(-50%);
-                z-index: 10000; width: 100%; max-width: 400px;
+                z-index: 10000; width: 100%; max-width: 400px; padding:10px;
                 display: flex; flex-direction: column; gap: 12px; pointer-events: none;
             }
             .droppy-alert {
@@ -375,3 +375,109 @@ function initSammyPickers(triggerId, inputId) {
 //     document.addEventListener('click', () => picker.style.display = 'none');
 //     picker.addEventListener('click', (e) => e.stopPropagation());
 // }
+
+
+
+/**
+ * TikTok-Style Interaction Engine
+ * Handles Emojis and Gifts for any input group
+ */
+const initInteractionEngine = () => {
+    // 1. Inject Global Styles (Keep CSS inside the JS for true portability)
+    const style = document.createElement('style');
+    style.innerHTML = `
+        .interaction-popover {
+            position: absolute; bottom: 70px; right: 10px; margin:10px;
+            background: rgba(255, 255, 255, 0.98); backdrop-filter: blur(10px);
+            border: 1px solid #eee; border-radius: 1.25rem;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.1); z-index: 2000;
+            padding: 12px; min-width: 180px;
+            transform-origin: bottom right;
+            animation: popUp 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.2);
+        }
+        @keyframes popUp { 
+            0% { transform: scale(0.5) translateY(20px); opacity: 0; }
+            100% { transform: scale(1) translateY(0); opacity: 1; }
+        }
+        .pop-item { transition: transform 0.2s; cursor: pointer; padding: 5px; border-radius: 8px; }
+        .pop-item:hover { transform: scale(1.25); background: #f8f9fa; }
+        .gift-tag { font-size: 0.65rem; font-weight: 800; color: #0d6efd; margin-top: -5px; }
+    `;
+    document.head.appendChild(style);
+
+    // 2. The Master Click Listener
+    document.addEventListener('click', (e) => {
+        const trigger = e.target.closest('.pop-trigger');
+        const activePopover = document.querySelector('.interaction-popover');
+
+        // Close logic: If we click away, destroy the popover
+        if (!trigger && activePopover && !e.target.closest('.interaction-popover')) {
+            activePopover.remove();
+            return;
+        }
+
+        if (trigger) {
+            const type = trigger.dataset.type;
+            const parent = trigger.closest('.custom-interaction-group');
+            const input = parent.querySelector('.main-input');
+
+            // If a popover is already open here, close it and stop
+            if (activePopover && activePopover.parentElement === parent && activePopover.dataset.type === type) {
+                activePopover.remove();
+                return;
+            }
+
+            // Clean up any other open popovers
+            if (activePopover) activePopover.remove();
+
+            // 3. Generate Content
+            const popover = document.createElement('div');
+            popover.className = 'interaction-popover';
+            popover.dataset.type = type;
+
+            if (type === 'emoji') {
+                const emojis = ['🔥', '🙌', '🎸', '❤️', '🎶', '✨', '💯', '🤩', '🎹', '⚡'];
+                popover.innerHTML = `<div class="d-flex flex-wrap gap-2">
+                    ${emojis.map(em => `<div class="pop-item emoji-select fs-4">${em}</div>`).join('')}
+                </div>`;
+            } else if (type === 'gift') {
+                const gifts = [
+                    {img: '🌹', val: '1'}, {img: '🔥', val: '5'}, {img: '💎', val: '50'}, {img: '👑', val: '99'}
+                ];
+                popover.innerHTML = `
+                    <h6 class="text-muted fw-bold mb-2" style="font-size:10px">SEND A GIFT</h6>
+                    <div class="row g-2 text-center">
+                        ${gifts.map(g => `
+                            <div onclick="alert('${g.img}')" class="col-3 pop-item gift-select">
+                                <div class="fs-3">${g.img}</div>
+                                <div class="gift-tag">${g.val}</div>
+                            </div>
+                        `).join('')}
+                    </div>`;
+            }
+
+            // 4. Attach & Position
+            parent.appendChild(popover);
+
+            // 5. Click Logic inside Popover
+            popover.onclick = (pe) => {
+                const emoji = pe.target.closest('.emoji-select');
+                const gift = pe.target.closest('.gift-select');
+
+                if (emoji) {
+                    input.value += emoji.innerText;
+                    input.focus();
+                }
+                if (gift) {
+                    // Trigger a custom event for your backend
+                    const event = new CustomEvent('giftSent', { detail: { type: gift.innerText } });
+                    document.dispatchEvent(event);
+                    popover.remove();
+                }
+            };
+        }
+    });
+};
+
+// Start the engine
+initInteractionEngine();

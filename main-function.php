@@ -5,7 +5,7 @@ if (session_status() === PHP_SESSION_NONE) {
 }
 
 class Main {
-    private $conn;
+    public $conn;
 
     public function __construct($conn) {
         $this->conn = $conn;

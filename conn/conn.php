@@ -34,36 +34,36 @@ else {
 // Always select DB after creation
 $conn->select_db($db_name);
 
-function timeAgo($dateTime)
-{
-    // Convert string to timestamp
-    $timestamp = strtotime($dateTime);
-    $seconds = time() - $timestamp;
+// function timeAgo($dateTime)
+// {
+//     // Convert string to timestamp
+//     $timestamp = strtotime($dateTime);
+//     $seconds = time() - $timestamp;
 
-    if ($seconds < 60) {
-        return $seconds . 's ago';
-    }
+//     if ($seconds < 60) {
+//         return $seconds . 's ago';
+//     }
 
-    $minutes = floor($seconds / 60);
-    if ($minutes < 60) {
-        return $minutes . ' min' . ($minutes > 1 ? 's' : '') . ' ago';
-    }
+//     $minutes = floor($seconds / 60);
+//     if ($minutes < 60) {
+//         return $minutes . ' min' . ($minutes > 1 ? 's' : '') . ' ago';
+//     }
 
-    $hours = floor($minutes / 60);
-    if ($hours < 24) {
-        return $hours . ' hour' . ($hours > 1 ? 's' : '') . ' ago';
-    }
+//     $hours = floor($minutes / 60);
+//     if ($hours < 24) {
+//         return $hours . ' hour' . ($hours > 1 ? 's' : '') . ' ago';
+//     }
 
-    $days = floor($hours / 24);
-    if ($days < 30) {
-        return $days . ' day' . ($days > 1 ? 's' : '') . ' ago';
-    }
+//     $days = floor($hours / 24);
+//     if ($days < 30) {
+//         return $days . ' day' . ($days > 1 ? 's' : '') . ' ago';
+//     }
 
-    $months = floor($days / 30);
-    if ($months < 12) {
-        return $months . ' month' . ($months > 1 ? 's' : '') . ' ago';
-    }
+//     $months = floor($days / 30);
+//     if ($months < 12) {
+//         return $months . ' month' . ($months > 1 ? 's' : '') . ' ago';
+//     }
 
-    $years = floor($months / 12);
-    return $years . ' year' . ($years > 1 ? 's' : '') . ' ago';
-}
+//     $years = floor($months / 12);
+//     return $years . ' year' . ($years > 1 ? 's' : '') . ' ago';
+// }

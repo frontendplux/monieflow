@@ -181,19 +181,192 @@
     </div>
 </header>
 
-<div class="offcanvas offcanvas-top" style="background:#f0f8ffde;" tabindex="-1" id="offcanvasExample" aria-labelledby="offcanvasExampleLabel">
+<div class="offcanvas offcanvas-start" tabindex="-1" id="offcanvasExample" aria-labelledby="offcanvasExampleLabel">
   <div class="offcanvas-header">
     <h5 class="offcanvas-title" id="offcanvasExampleLabel">monieFlow</h5>
     <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
   </div>
   <div class="offcanvas-body">
-    <div class="d-flex flex-wrap gap-3 text-capitalize">
+    <!-- <div class="d-flex flex-wrap gap-3 text-capitalize">
       <a href="">home</a>
       <a href="">games</a>
       <a href="">hotel management</a>
       <a href="">gaming</a>
       <a href="">gift card</a>
+    </div> -->
+<section class="py-6 bg-white border-top">
+    <div class="container">
+        
+        <div class="text-center mb-5">
+            <h6 class="text-primary fw-800 text-uppercase tracking-widest small mb-2">Platform Directory</h6>
+            <h2 class="fw-900 display-4 tracking-tighter">Explore Our Services</h2>
+            <p class="text-muted mx-auto" style="max-width: 600px;">Everything you need to create, manage, and scale your career in the modern music ecosystem.</p>
+        </div>
+
+        <div class="row g-1">
+            
+            <div class="w-100">
+                <h5 class="fw-900 mb-4 border-start border-primary border-4 ps-3">Entertainment</h5>
+                <ul class="list-unstyled d-flex flex-column gap-3">
+                    <li class="nav-item-service">
+                        <a href="#" class="d-flex align-items-center text-decoration-none group">
+                            <div class="icon-circle bg-light me-3"><i class="bi bi-play-btn-fill"></i></div>
+                            <div>
+                                <span class="d-block fw-bold text-dark">Music Reels</span>
+                                <small class="text-muted">Short-form discovery</small>
+                            </div>
+                        </a>
+                    </li>
+                    <li class="nav-item-service">
+                        <a href="#" class="d-flex align-items-center text-decoration-none">
+                            <div class="icon-circle bg-light me-3"><i class="bi bi-controller"></i></div>
+                            <div>
+                                <span class="d-block fw-bold text-dark">Game Center</span>
+                                <small class="text-muted">Rhythm & Trivia</small>
+                            </div>
+                        </a>
+                    </li>
+                    <li class="nav-item-service">
+                        <a href="#" class="d-flex align-items-center text-decoration-none">
+                            <div class="icon-circle bg-light me-3"><i class="bi bi-camera-reels"></i></div>
+                            <div>
+                                <span class="d-block fw-bold text-dark">Video Center</span>
+                                <small class="text-muted">High-res premieres</small>
+                            </div>
+                        </a>
+                    </li>
+                </ul>
+            </div>
+
+            <div class="w-100">
+                <h5 class="fw-900 mb-4 border-start border-dark border-4 ps-3">Professional</h5>
+                <ul class="list-unstyled d-flex flex-column gap-3">
+                    <li class="nav-item-service">
+                        <a href="#" class="d-flex align-items-center text-decoration-none">
+                            <div class="icon-circle bg-light me-3"><i class="bi bi-person-badge"></i></div>
+                            <div>
+                                <span class="d-block fw-bold text-dark">Book Talent</span>
+                                <small class="text-muted">Hire verified creators</small>
+                            </div>
+                        </a>
+                    </li>
+                    <li class="nav-item-service">
+                        <a href="#" class="d-flex align-items-center text-decoration-none">
+                            <div class="icon-circle bg-light me-3"><i class="bi bi-briefcase"></i></div>
+                            <div>
+                                <span class="d-block fw-bold text-dark">Local Jobs</span>
+                                <small class="text-muted">Opportunities near you</small>
+                            </div>
+                        </a>
+                    </li>
+                    <li class="nav-item-service">
+                        <a href="#" class="d-flex align-items-center text-decoration-none">
+                            <div class="icon-circle bg-light me-3"><i class="bi bi-building"></i></div>
+                            <div>
+                                <span class="d-block fw-bold text-dark">Agency Roster</span>
+                                <small class="text-muted">Management network</small>
+                            </div>
+                        </a>
+                    </li>
+                </ul>
+            </div>
+
+            <div class="w-100">
+                <h5 class="fw-900 mb-4 border-start border-warning border-4 ps-3">Legacy</h5>
+                <ul class="list-unstyled d-flex flex-column gap-3">
+                    <li class="nav-item-service">
+                        <a href="#" class="d-flex align-items-center text-decoration-none">
+                            <div class="icon-circle bg-light me-3"><i class="bi bi-shield-check"></i></div>
+                            <div>
+                                <span class="d-block fw-bold text-dark">Estate Mgmt</span>
+                                <small class="text-muted">Digital asset security</small>
+                            </div>
+                        </a>
+                    </li>
+                    <li class="nav-item-service">
+                        <a href="#" class="d-flex align-items-center text-decoration-none">
+                            <div class="icon-circle bg-light me-3"><i class="bi bi-safe2"></i></div>
+                            <div>
+                                <span class="d-block fw-bold text-dark">Royalty Vault</span>
+                                <small class="text-muted">Revenue & Licensing</small>
+                            </div>
+                        </a>
+                    </li>
+                </ul>
+            </div>
+
+            <div class="w-100">
+                <h5 class="fw-900 mb-4 border-start border-success border-4 ps-3">Lifestyle</h5>
+                <ul class="list-unstyled d-flex flex-column gap-3">
+                    <li class="nav-item-service">
+                        <a href="#" class="d-flex align-items-center text-decoration-none">
+                            <div class="icon-circle bg-light me-3"><i class="bi bi-hospital"></i></div>
+                            <div>
+                                <span class="d-block fw-bold text-dark">Hotel Booking</span>
+                                <small class="text-muted">Artist-friendly stays</small>
+                            </div>
+                        </a>
+                    </li>
+                    <li class="nav-item-service">
+                        <a href="#" class="d-flex align-items-center text-decoration-none">
+                            <div class="icon-circle bg-light me-3"><i class="bi bi-geo-alt"></i></div>
+                            <div>
+                                <span class="d-block fw-bold text-dark">Tour Support</span>
+                                <small class="text-muted">Local logistics</small>
+                            </div>
+                        </a>
+                    </li>
+                </ul>
+            </div>
+
+        </div>
     </div>
+</section>
+
+<style>
+/* Modern List Typography */
+.fw-900 { font-weight: 900; }
+.fw-800 { font-weight: 800; }
+.tracking-tighter { letter-spacing: -2px; }
+.tracking-widest { letter-spacing: 0.1em; }
+.py-6 { padding: 6rem 0; }
+
+/* Icon Circle Styling */
+.icon-circle {
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.25rem;
+    color: #000;
+    transition: all 0.3s ease;
+}
+
+/* Hover Interaction */
+.nav-item-service a {
+    padding: 8px;
+    border-radius: 16px;
+    transition: background 0.2s ease;
+}
+
+.nav-item-service a:hover {
+    background-color: #f8f9fa;
+}
+
+.nav-item-service a:hover .icon-circle {
+    background-color: #0d6efd !important;
+    color: #fff !important;
+    transform: scale(1.1);
+}
+
+.nav-item-service a:hover span {
+    color: #0d6efd !important;
+}
+</style>
+
+    <!--  -->
   </div>
 </div>
 <style>

@@ -1,12 +1,17 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <?php include __DIR__."/../main-function.php"; ?>
+    <?php include __DIR__."/req.php"; ?>
     <?php 
-        $main = new main($conn);
+        $main = new comments($conn);
         if($main->isLoggedIn() === false) header('location:/');
         $userData = $main->getUserData()['data'];
         $profile = json_decode($userData['profile'], true);
+        $feeds=$_GET['feed'] ?? header('location:/feeds/'); 
+        $comments=$main->feedWithComments($feeds);
+        print_r($comments);
+        $comment_data=json_decode($comments['data'], true);
+        $comment_profile=json_decode($comments['profile'],true);
     ?>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -119,11 +124,7 @@
 
 <header class="sticky-top bg-white border-bottom d-flex align-items-center justify-content-between px-3" style="height: 56px; z-index: 1000;">
     <div class="d-flex align-items-center">
-        <a href="/home" class="fb-nav-icon me-3 text-dark text-decoration-none"><i class="ri-close-line fs-4"></i></a>
-        <div class="brand-logo" style="font-weight: 800; font-size: 1.4rem; color: var(--fb-blue);">monieFlow</div>
-    </div>
-    <div class="d-flex gap-2">
-        <div class="fb-nav-icon bg-light rounded-circle" style="width:40px; height:40px; display:flex; align-items:center; justify-content:center;"><i class="ri-more-fill"></i></div>
+        <a href="javascript:;" onclick="history.back()" class="fb-nav-icon me-3 text-dark text-decoration-none"><i class="ri-arrow-left-s-line fs-4"></i></a>
     </div>
 </header>
 
@@ -140,26 +141,38 @@
             <div class="d-flex align-items-center mb-3">
                 <img src="https://i.pravatar.cc/150?u=author" class="rounded-circle me-3" width="45" height="45">
                 <div>
-                    <h6 class="mb-0 fw-bold">Mark Johnson</h6>
-                    <small class="text-muted">February 9 at 9:59 PM · <i class="ri-global-line"></i></small>
+                    <h6 class="mb-0 fw-bold"><?= $comment_profile['first_name']. " ". $comment_profile['first_name']   ?></h6>
+                    <small class="text-muted"><?= $comments['feed_created']  ?> · <i class="ri-global-line"></i></small>
                 </div>
             </div>
 
             <div class="post-description mb-4">
-                <p>Building the future of social finance with <b>monieFlow</b>. Check out this clean split-screen view for discussions! What do you think?</p>
+                <p><?= $comments['txt'] ?? $comment_data['content']  ?></p>
                 <div class="d-flex gap-2 mb-2">
-                    <span class="badge bg-light text-primary border">#UIUX</span>
-                    <span class="badge bg-light text-primary border">#MonieFlow</span>
+                    <?php
+
+$parts = array_filter(explode('#', $comments['keywords']));
+// rebuild each part into a badge span
+$badges = array_map(function($tag) {
+    $tag = trim($tag);
+    return $tag !== '' 
+        ? '<span class="badge bg-light text-primary border">#' . htmlspecialchars($tag) . '</span>' 
+        : '';
+}, $parts);
+
+// output inline
+echo implode(' ', $badges);
+?>
                 </div>
             </div>
 
             <div class="d-flex justify-content-between py-2 border-top border-bottom mb-3">
-                <div class="d-flex align-items-center gap-1 text-primary">
-                    <i class="ri-thumb-up-fill"></i> <small>1.2k</small>
+                <div class="d-flex align-items-center gap-1 text-primary" style="cursor:pointer" onclick="like_post(<?= $comments['feed_id']  ?>,'<?= $comments['status']  ?>')">
+                    <i class="ri-thumb-up-fill"></i> <small id="like-<?= $comments['feed_id']  ?>"><?= $comments['like_count']  ?></small>
                 </div>
                 <div class="text-muted small">
-                    <span class="me-2">85 Comments</span>
-                    <span>12 Shares</span>
+                    <span class="me-2"><small id="comment-<?= $comments['feed_id']  ?>"><?= $comments['like_count']  ?></small> Comments</span>
+                    <span> Shares</span>
                 </div>
             </div>
 
@@ -227,5 +240,6 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script src="/feeds/comment/script.js"></script>
 </body>
 </html>
