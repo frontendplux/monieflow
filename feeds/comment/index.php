@@ -122,9 +122,6 @@
     </style>
 </head>
 <body>
-<pre>
-    <?=  print_r(json_encode($comments,JSON_PRETTY_PRINT)); ?>
-</pre>
 <header class="sticky-top bg-white border-bottom d-flex align-items-center justify-content-between px-3" style="height: 56px; z-index: 1000;">
     <div class="d-flex align-items-center">
         <a href="javascript:;" onclick="history.back()" class="fb-nav-icon me-3 text-dark text-decoration-none"><i class="ri-arrow-left-s-line fs-4"></i></a>

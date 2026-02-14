@@ -94,6 +94,7 @@ function promo_reels(reel,offset,limit){
                                     </div>
                                 </a>`}).join('')}
   `
+  document.getElementById('reelifield').innerHTML="";
   helper(html,true);
 }
 

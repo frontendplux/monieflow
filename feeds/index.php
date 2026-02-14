@@ -382,7 +382,9 @@
                     <div style="width: 100%; max-width: 590px;">
                         <!-- Stories/Reels Section (Horizontal Scroll) -->
                         <div class="container px-0">
-                            <div id="reelifield" class="d-flex gap-3 pb-3 overflow-auto" style="scrollbar-width: none; -ms-overflow-style: none;"></div>
+                            <div id="reelifield" class="d-flex gap-3 pb-3 overflow-auto" style="scrollbar-width: none; -ms-overflow-style: none;">
+                                
+                            </div>
                         </div>
                         <div class="composer-card mb-3">
                             <div class="d-flex align-items-center mb-3">

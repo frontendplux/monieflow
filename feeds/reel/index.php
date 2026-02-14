@@ -122,7 +122,7 @@
 <body>
 
 <div class="reel-top-bar">
-    <i class="ri-arrow-s-left-s-line fs-3 text-white" onclick="history.back()"></i>
+    <i class="ri-arrow-left-s-line fs-3 text-white" onclick="history.back()"></i>
     <div class="d-flex gap-4 fw-bold">
         <span class="text-white-50">Following</span>
         <span class="text-white border-bottom border-3 pb-1">For You</span>
@@ -134,7 +134,6 @@
     
     <div class="reel-video-wrapper">
         <video loop muted autoplay playsinline src="https://assets.mixkit.co/videos/preview/mixkit-girl-in-neon-light-dancing-alone-34087-large.mp4"></video>
-        
         <div class="side-actions">
             <div class="action-item">
                 <i class="ri-heart-fill text-danger"></i>
