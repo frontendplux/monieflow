@@ -6,7 +6,6 @@
         $new=new reels($conn);
         if(!$new->isLoggedIn()) header('location:/');
         $music=$new->getMusic();
-        print_r($music)
     ?>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -63,20 +62,19 @@
                 </div>
                 
                 <ul class="list-unstyled">
-                    <li class="d-flex align-items-center gap-3 p-3 rounded-4 hover-bg-info-10 transition mb-3 border border-white border-opacity-10" onclick="selectTrack('Turbulence')">
-                        <div class="bg-info rounded-circle text-black fw-bold d-flex align-items-center justify-content-center" style="min-width: 35px; height: 35px; font-size: 12px;">01</div>
+                <?php foreach ($music as $key => $value):
+                    $data=json_decode($value['data'],true);
+                    $key += 1;
+                 ?>
+                    <li class="d-flex align-items-center gap-3 p-3 rounded-4 hover-bg-info-10 transition mb-3 border border-white border-opacity-10" onclick="selectTrack('<?= $value['txt'] ?? $data['title'] ?>','<?= '/uploads/audio/'.$data['audio'] ?>')">
+                        <div class="bg-<?= $key == 1 ? 'info' : 'white' ?> rounded-circle text-black fw-bold d-flex align-items-center justify-content-center" style="min-width: 35px; height: 35px; font-size: 12px;"><?= $key ?> </div>
                         <div class="flex-grow-1 overflow-hidden">
-                            <div class="text-white text-truncate fw-semibold">Turbulence</div>
-                            <div class="text-info opacity-75 text-truncate" style="font-size: 11px;">feat. Wizkid</div>
+                            <img src="/uploads/covers/<?= $data['cover'] ?>" style="width:100px" alt="">
+                            <div class="text-white text-truncate fw-semibold"><?= $value['txt'] ?? $data['title'] ?></div>
+                            <div class="text-info opacity-75 text-truncate" style="font-size: 11px;"><?= $value['description'] ?? $data['title'] ?></div>
                         </div>
                     </li>
-                    <li class="d-flex align-items-center gap-3 p-3 rounded-4 hover-bg-info-10 transition mb-3 border border-white border-opacity-10" onclick="selectTrack('Jogodo')">
-                        <div class="bg-white bg-opacity-10 rounded-circle text-white d-flex align-items-center justify-content-center" style="min-width: 35px; height: 35px; font-size: 12px;">02</div>
-                        <div class="flex-grow-1 overflow-hidden">
-                            <div class="text-white text-truncate fw-semibold">Jogodo</div>
-                            <div class="text-info opacity-75 text-truncate" style="font-size: 11px;">Asake</div>
-                        </div>
-                    </li>
+                <?php endforeach; ?>
                 </ul>
             </div>
         </div>
@@ -95,78 +93,142 @@
                     <p id="currentTrack" class="text-white fw-bold mb-0">None Selected</p>
                 </div>
                </div>
-    <script>
-        let isRecording = false;
-        let audioCtx, mp3Source, mixedStream;
-        const bgMusic = new Audio('mp3.mp3'); // Ensure this file is in your folder
-        bgMusic.crossOrigin = "anonymous";
-        // DOM Elements
-        const sidebar = document.getElementById('musicSidebar');
-        const toggleBtn = document.getElementById('sidebarToggle');
-        const toggleIcon = document.getElementById('toggleIcon');
-        const innerCircle = document.getElementById('innerCircle');
-        const recStatus = document.getElementById('recStatus');
 
-        // Initialize Camera and Mixer
-        async function initStudio() {
-            try {
-                const userStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-                document.getElementById('preview').srcObject = userStream;
+               <audio src="" id="audio-lite" class="d-none"></audio>
 
-                // Set up the Audio Context for Mixing
-                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-                const micSource = audioCtx.createMediaStreamSource(userStream);
-                mp3Source = audioCtx.createMediaElementSource(bgMusic);
-                const destination = audioCtx.createMediaStreamDestination();
+               <script>
+let isRecording = false;
+let mediaRecorder;
+let recordedChunks = [];
+let audioCtx, micSource, mp3Source, mixedStream;
 
-                // Connect both to the final destination
-                micSource.connect(destination);
-                mp3Source.connect(destination);
-                mp3Source.connect(audioCtx.destination); // For you to hear it
+const bgMusic = document.getElementById('audio-lite');
+bgMusic.crossOrigin = "anonymous";
 
-                mixedStream = new MediaStream([
-                    userStream.getVideoTracks()[0],
-                    destination.stream.getAudioTracks()[0]
-                ]);
-            } catch (err) {
-                console.error("Studio Init Failed:", err);
-            }
-        }
+const innerCircle = document.getElementById('innerCircle');
+const recStatus = document.getElementById('recStatus');
 
-        // Sidebar Toggle Logic
-        toggleBtn.onclick = () => {
-            sidebar.classList.toggle('active');
-            toggleIcon.className = sidebar.classList.contains('active') ? 'ri-close-line' : 'ri-music-2-fill';
+async function initStudio() {
+    try {
+
+        const userStream = await navigator.mediaDevices.getUserMedia({
+            video: true,
+            audio: true
+        });
+
+        document.getElementById('preview').srcObject = userStream;
+
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+        micSource = audioCtx.createMediaStreamSource(userStream);
+        mp3Source = audioCtx.createMediaElementSource(bgMusic);
+
+        const destination = audioCtx.createMediaStreamDestination();
+
+        micSource.connect(destination);
+        mp3Source.connect(destination);
+        mp3Source.connect(audioCtx.destination);
+
+        mixedStream = new MediaStream([
+            userStream.getVideoTracks()[0],
+            destination.stream.getAudioTracks()[0]
+        ]);
+
+    } catch (err) {
+        console.error(err);
+    }
+}
+
+function selectTrack(name, audio) {
+    bgMusic.src = audio;
+    bgMusic.load();
+    document.getElementById('currentTrack').innerText = name;
+}
+
+document.getElementById('recordBtn').onclick = async () => {
+
+    if (!mixedStream) return;
+
+    if (!isRecording) {
+
+        if (audioCtx.state === 'suspended') await audioCtx.resume();
+
+        recordedChunks = [];
+
+        mediaRecorder = new MediaRecorder(mixedStream, {
+            mimeType: 'video/webm;codecs=vp8,opus'
+        });
+
+        mediaRecorder.ondataavailable = e => {
+            if (e.data.size > 0) recordedChunks.push(e.data);
         };
 
-        // Track Selection Logic
-        function selectTrack(name) {
-            document.getElementById('currentTrack').innerText = name;
-            if (window.innerWidth < 768) sidebar.classList.remove('active');
-        }
+        mediaRecorder.onstop = uploadVideo;
 
-        // Record Toggle Logic
-        document.getElementById('recordBtn').onclick = () => {
-            if (audioCtx.state === 'suspended') audioCtx.resume();
-            
-            isRecording = !isRecording;
-            if (isRecording) {
-                bgMusic.play();
-                innerCircle.style.transform = "scale(0.7)";
-                innerCircle.style.borderRadius = "12px";
-                recStatus.classList.remove('d-none');
-                recStatus.classList.add('rec-active');
-            } else {
+        mediaRecorder.start();
+        bgMusic.play();
+
+        innerCircle.style.transform = "scale(0.7)";
+        innerCircle.style.borderRadius = "12px";
+        recStatus.classList.remove('d-none');
+        recStatus.classList.add('rec-active');
+
+        isRecording = true;
+
+        // AUTO STOP AFTER 5 SECONDS
+        setTimeout(() => {
+            if (mediaRecorder.state !== "inactive") {
+
+                mediaRecorder.stop();
+
                 bgMusic.pause();
                 bgMusic.currentTime = 0;
+
                 innerCircle.style.transform = "scale(1)";
                 innerCircle.style.borderRadius = "50%";
                 recStatus.classList.add('d-none');
                 recStatus.classList.remove('rec-active');
-            }
-        };
 
-        window.onload = initStudio;
-    </script>
+                isRecording = false;
+            }
+        }, 5000);
+
+    }
+};
+
+async function uploadVideo() {
+
+    const blob = new Blob(recordedChunks, { type: 'video/webm' });
+
+    const formData = new FormData();
+    formData.append("video", blob);
+    formData.append("title", document.getElementById("currentTrack").innerText);
+    formData.append("description", "5 seconds reel");
+    formData.append("category", "reel");
+
+    try {
+
+        const response = await fetch("upload.php", {
+            method: "POST",
+            body: formData
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+            alert("Reel uploaded successfully 🔥");
+        } else {
+            alert(result.message);
+        }
+
+    } catch (err) {
+        console.error(err);
+        alert("Upload failed");
+    }
+}
+
+window.onload = initStudio;
+</script>
+
 </body>
 </html>

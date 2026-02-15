@@ -71,14 +71,18 @@ input[type="file"] { display: none; }
 </head>
 
 <body class="py-5">
-
+ <div class="position-fixed w-100 top-0 p-2" style="z-index: 23390; background: #f0f8ffab;">
+        <div class="container px-0 d-flex justify-content-between " >
+            <a href="javascript:;" onclick="history.back()" class="ri-arrow-left-s-line text-decoration-none fs-3 text-dark d-flex align-items-center"> <span class="fs-5 fw-bolder text-uppercase">upload music</span></a>
+           
+        </div>
+    </div>
 <div class="container">
 <div class="row justify-content-center">
 <div class="col-xl-10 col-lg-11">
 
 <div class="text-center mb-5">
-<h1 class="display-5 fw-bold text-info">FlowBeat</h1>
-<p class="text-secondary tracking-widest small">PUBLISH TO THE FLOW STUDIO</p>
+
 </div>
 
 <div class="upload-card p-4 p-md-5 shadow-lg">
@@ -170,15 +174,16 @@ style="width: 32px; height: 32px; border: 3px solid white; cursor: pointer;">
 <button type="submit" class="btn btn-boss w-100">
 <i class="ri-rocket-2-fill me-2"></i>GO LIVE
 </button>
-
 </div>
 </div>
 </form>
 </div>
 </div>
+<!-- <h1 class="display-5 fw-bold text-info">FlowBeat</h1> -->
+<p class="text-secondary tracking-widest small mt-5 text-center">PUBLISH TO THE FLOW STUDIO</p>
 </div>
 </div>
-
+<script src="/api.js"></script>
 <script>
 const fileInput = document.getElementById('fileInput');
 const coverInput = document.getElementById('coverInput');
@@ -227,7 +232,7 @@ form.onsubmit = function(e){
 
     const audioFile = fileInput.files[0];
     if(!audioFile){
-        alert("Select audio file");
+         droppySammy('info', 'Auth Error',"Select audio file");
         return;
     }
 
@@ -255,10 +260,10 @@ form.onsubmit = function(e){
 
     xhr.onload = function(){
         if(xhr.status === 200){
-            alert("Boss! Your vibe is live.");
-            window.location.href = "studio.html";
+          droppySammy('success', 'Successfully Uploaded',"Boss! Your vibe is live.");
+            window.location.href = "/profile/";
         }else{
-            alert("Upload failed");
+           droppySammy('danger', 'Auth Error',"Upload failed");
         }
     };
 
