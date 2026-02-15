@@ -397,7 +397,7 @@
                             <div class="d-flex justify-content-around">
                                 <a href="/live/"  class="btn btn-link text-decoration-none text-secondary fw-bold flex-grow-1 py-2 rounded sidebar-link border-0 justify-content-center"><i class="ri-video-add-fill text-danger me-2"></i> Reels</a>
                                 <a href="/feeds/create.php" class="btn btn-link text-decoration-none text-secondary fw-bold flex-grow-1 py-2 rounded sidebar-link border-0 justify-content-center" onclick="document.getElementById('image-open').click()"><i class="ri-image-2-fill text-success me-2"></i> Photo</a>
-                                <a href="/shop/create.php" class="btn btn-link text-decoration-none text-secondary fw-bold flex-grow-1 py-2 rounded sidebar-link border-0 justify-content-center"><i class="ri-shopping-bag-fill text-warning me-2"></i> Shopping</a>
+                                <a href="/feeds/music/create.php" class="btn btn-link text-decoration-none text-secondary fw-bold flex-grow-1 py-2 rounded sidebar-link border-0 justify-content-center"><i class="ri-music-fill text-warning me-2"></i> Music</a>
                             </div>
                         </div>
                         <div id="rooterfild"></div>
