@@ -1,0 +1,90 @@
+<script>
+    async function startCamera() {
+    const constraints = { 
+        video: true, 
+        audio: true 
+    };
+
+    try {
+        // Returns a Promise that resolves to a MediaStream
+        const stream = await navigator.mediaDevices.getUserMedia(constraints);
+        
+        // Connect the stream to a <video> element
+        const videoElement = document.querySelector('video');
+        videoElement.srcObject = stream;
+    } catch (err) {
+        console.error("Error accessing media devices.", err);
+    }
+}
+
+
+async function combineAudioWithStream(cameraStream) {
+    const audioContext = new AudioContext();
+    
+    // 1. Setup the audio element
+    const myAudio = new Audio('mp3.mp3');
+    myAudio.crossOrigin = "anonymous"; // Prevents CORS issues
+    
+    // 2. Create the source and destination
+    const source = audioContext.createMediaElementSource(myAudio);
+    const destination = audioContext.createMediaStreamDestination();
+    
+    // 3. Connect the audio to the destination (and your speakers)
+    source.connect(destination);
+    source.connect(audioContext.destination); // So you can hear it too!
+    
+    // 4. Get the audio track from our virtual mixer
+    const audioTrack = destination.stream.getAudioTracks()[0];
+    
+    // 5. Add it to your existing camera stream
+    cameraStream.addTrack(audioTrack);
+    
+    myAudio.play();
+    console.log("MP3 added to the stream!");
+}
+
+
+
+async function startFullStream() {
+    // 1. Get Video and Mic from the user
+    const userStream = await navigator.mediaDevices.getUserMedia({ 
+        video: true, 
+        audio: true 
+    });
+
+    // 2. Setup the Audio Mixer
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    
+    // 3. Create the MP3 Source
+    const bgMusic = new Audio('mp3.mp3');
+    bgMusic.crossOrigin = "anonymous";
+    const mp3Source = audioCtx.createMediaElementSource(bgMusic);
+
+    // 4. Create the Mic Source (from the userStream)
+    const micSource = audioCtx.createMediaStreamSource(userStream);
+
+    // 5. Create a Destination for the mixed audio
+    const audioDestination = audioCtx.createMediaStreamDestination();
+
+    // 6. Connect both to the mixer
+    mp3Source.connect(audioDestination);
+    micSource.connect(audioDestination);
+    
+    // Optional: Connect MP3 to your speakers so you can hear it
+    mp3Source.connect(audioCtx.destination);
+
+    // 7. STITCHING: Combine the original Video track with the NEW Mixed Audio
+    const combinedStream = new MediaStream([
+        userStream.getVideoTracks()[0],         // Original Camera
+        audioDestination.stream.getAudioTracks()[0] // Mixed Mic + MP3
+    ]);
+
+    // 8. Play it in a <video> element
+    const outputVideo = document.querySelector('video');
+    outputVideo.srcObject = combinedStream;
+    
+    bgMusic.play();
+    console.log("Stream Active: Video + Mic + MP3 joined.");
+}
+
+</script>

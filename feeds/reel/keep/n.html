@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Live Record with Playlist Music</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+<style>
+body { margin:0; background:#111; color:white; font-family:sans-serif; }
+#preview { object-fit:cover; width:100%; height:60vh; background:#000; }
+.list-group-item.active { background:#1DB954; border-color:#1DB954; }
+.record-btn { margin-top:10px; padding:10px 20px; font-size:16px; }
+</style>
+</head>
+<body class="p-3">
+
+<h4>Playlist</h4>
+<div class="list-group mb-2" id="playlist"></div>
+
+<video id="preview" autoplay muted></video>
+<br>
+<button class="btn btn-danger record-btn" onclick="startRecording()">Start Recording 5s</button>
+
+<script>
+const playlist = [
+  {title:"Golden Hour", artist:"Sunset Collective", src:"https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3"},
+  {title:"Ocean Breeze", artist:"The Coastal Band", src:"https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3"},
+  {title:"City Lights", artist:"Urban Jazz Trio", src:"https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3"}
+];
+
+const playlistDiv = document.getElementById("playlist");
+let selectedTrack = 0;
+
+// Populate playlist
+playlist.forEach((track,index)=>{
+  const btn = document.createElement("button");
+  btn.className = "list-group-item list-group-item-action";
+  btn.innerHTML = `<strong>${track.title}</strong><br><small>${track.artist}</small>`;
+  btn.addEventListener("click",()=>{
+    selectedTrack = index;
+    updateActive();
+  });
+  playlistDiv.appendChild(btn);
+});
+updateActive();
+
+function updateActive(){
+  const items = playlistDiv.querySelectorAll(".list-group-item");
+  items.forEach((item,i)=> item.classList.toggle("active", i===selectedTrack));
+}
+
+// ----------- Recording Function -----------
+let recordedChunks = [];
+let stream, mediaRecorder;
+
+async function startRecording(){
+  const track = playlist[selectedTrack];
+  if(!track) { alert("Select a track!"); return; }
+
+  // Play selected track for user
+  const audio = new Audio(track.src);
+  audio.play();
+
+  // Get camera + mic
+  stream = await navigator.mediaDevices.getUserMedia({ video:true, audio:true });
+  document.getElementById('preview').srcObject = stream;
+
+  // Mix mic + music using Web Audio API
+  const audioContext = new AudioContext();
+  const destination = audioContext.createMediaStreamDestination();
+
+  const micSource = audioContext.createMediaStreamSource(stream);
+  micSource.connect(destination);
+
+  const musicAudio = new Audio(track.src);
+  musicAudio.crossOrigin = "anonymous";
+  const musicSource = audioContext.createMediaElementSource(musicAudio);
+  musicSource.connect(destination);
+  musicAudio.play();
+
+  // Combine video + mixed audio
+  const combinedStream = new MediaStream([
+    ...stream.getVideoTracks(),
+    ...destination.stream.getAudioTracks()
+  ]);
+
+  // Preview
+  document.getElementById('preview').srcObject = combinedStream;
+
+  // Start recording
+  recordedChunks = [];
+  mediaRecorder = new MediaRecorder(combinedStream);
+  mediaRecorder.ondataavailable = e => { if(e.data.size>0) recordedChunks.push(e.data); };
+  mediaRecorder.start();
+
+  // Stop after 5 seconds
+  setTimeout(() => {
+    mediaRecorder.stop();
+    audio.pause();
+    musicAudio.pause();
+  }, 5000);
+
+  mediaRecorder.onstop = () => {
+    const blob = new Blob(recordedChunks,{type:'video/webm'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'recorded_video.webm';
+    a.click();
+
+    // Stop camera
+    stream.getTracks().forEach(t=>t.stop());
+    audioContext.close();
+  };
+}
+</script>
+
+</body>
+</html>

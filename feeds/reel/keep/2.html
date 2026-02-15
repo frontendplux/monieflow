@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>15 Sec Video Recorder</title>
+</head>
+<body>
+
+<video id="preview" autoplay muted style="width:300px;"></video>
+<br><br>
+
+<button onclick="startRecording()">Record 15 Seconds</button>
+
+<script>
+let mediaRecorder;
+let recordedChunks = [];
+let stream;
+
+async function startRecording() {
+
+    stream = await navigator.mediaDevices.getUserMedia({
+        video: true,
+        audio: true
+    });
+
+    document.getElementById('preview').srcObject = stream;
+
+    mediaRecorder = new MediaRecorder(stream);
+
+    mediaRecorder.ondataavailable = event => {
+        if (event.data.size > 0) {
+            recordedChunks.push(event.data);
+        }
+    };
+
+    mediaRecorder.onstop = () => {
+        const blob = new Blob(recordedChunks, { type: 'video/webm' });
+        uploadVideo(blob);
+        recordedChunks = [];
+
+        // Stop camera
+        stream.getTracks().forEach(track => track.stop());
+    };
+
+    mediaRecorder.start();
+
+    // ⏳ Auto stop after 15 seconds
+    setTimeout(() => {
+        mediaRecorder.stop();
+    }, 15000);
+}
+
+function uploadVideo(blob) {
+    const formData = new FormData();
+    formData.append("video", blob, "video_15sec.webm");
+
+    fetch("u.php", {
+        method: "POST",
+        body: formData
+    })
+    .then(res => res.text())
+    .then(data => alert(data));
+}
+</script>
+
+</body>
+</html>

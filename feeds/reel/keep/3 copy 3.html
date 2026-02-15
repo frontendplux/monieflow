@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Record Video + Music</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+<style>
+body { margin:0; background:#111; color:white; font-family:sans-serif; }
+
+.record-wrapper {
+    position: relative;
+    width: 100px;
+    height: 100px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+svg { position: absolute; transform: rotate(-90deg); }
+
+circle { fill:none; stroke-width:6; }
+
+.progress-bg { stroke:#333; }
+.progress-bar { stroke:red; stroke-dasharray:283; stroke-dashoffset:283; transition:none; }
+
+.record-btn {
+    width:70px; height:70px; background:red; border-radius:50%; border:none; cursor:pointer; z-index:10; transition: transform 0.2s ease;
+}
+.record-btn:active { transform:scale(0.9); }
+
+#preview { object-fit:cover; }
+</style>
+</head>
+<body>
+
+<!-- Fullscreen video preview -->
+<video id="preview" autoplay muted class="position-fixed top-0 bottom-0 start-0 end-0 w-100 h-100"></video>
+
+<div class="col-8 col-md-4 position-fixed" style="font-size:small;bottom: 110px; right: 30px;z-index: 3000; height: 200px;">
+      <div class="card bg-white border-0 shadow-sm rounded-4 overflow-auto h-100">
+        <div class="list-group list-group-flush">
+          
+          <button class="list-group-item list-group-item-action d-flex justify-content-between align-items-center py-3 border-light">
+            <div class="d-flex align-items-center">
+              <span class="text-muted me-3 small fw-medium">1</span>
+              <div>
+                <h6 class="mb-0 small fw-bold">Golden Hour</h6>
+                <small class="text-muted">Sunset Collective</small>
+              </div>
+            </div>
+            <span class="text-muted small">3:12</span>
+          </button>
+
+          <button class="list-group-item list-group-item-action active d-flex justify-content-between align-items-center py-3 border-0" aria-current="true">
+            <div class="d-flex align-items-center">
+              <span class="me-3 small"><i class="ri-equalizer-fill"></i></span>
+              <div>
+                <h6 class="mb-0 small fw-bold text-white">Ocean Breeze</h6>
+                <small class="text-white-50">The Coastal Band</small>
+              </div>
+            </div>
+            <span class="badge rounded-pill bg-white text-primary small">4:45</span>
+          </button>
+
+          <button class="list-group-item list-group-item-action d-flex justify-content-between align-items-center py-3 border-light">
+            <div class="d-flex align-items-center">
+              <span class="text-muted me-3 small fw-medium">3</span>
+              <div>
+                <h6 class="mb-0 small fw-bold">City Lights</h6>
+                <small class="text-muted">Urban Jazz Trio</small>
+              </div>
+            </div>
+            <span class="text-muted small">2:58</span>
+          </button>
+          
+        </div>
+    </div>
+  </div>
+<!-- Bottom control bar -->
+<div class="position-fixed bottom-0 start-0 end-0 d-flex justify-content-around align-items-center mb-4">
+    <a href="#"><img class="rounded-2 border-warning border border-2" src="https://picsum.photos/50" alt="Post content" style="width:50px;height:50px;"></a>
+    
+    <div class="record-wrapper">
+        <svg width="100" height="100">
+            <circle class="progress-bg" cx="50" cy="50" r="45"></circle>
+            <circle class="progress-bar" cx="50" cy="50" r="45"></circle>
+        </svg>
+        <button class="record-btn" onclick="startRecording()"></button>
+    </div>
+
+    <div style="width:50px;"></div>
+</div>
+<!-- Music picker -->
+<div class="position-fixed bottom-20 start-50 translate-middle-x mb-2">
+    <input type="file" id="musicInput" accept="audio/*" class="form-control">
+</div>
+
+
+<script>
+let recordedChunks = [];
+let stream, mediaRecorder;
+
+async function startRecording() {
+    kondio=document.createElement('audio');
+    kondio.src='d.mp3';
+    // document.appendChild(audio);
+    kondio.play();
+    const progress = document.querySelector('.progress-bar');
+    const musicFile = document.getElementById("musicInput").files[0];
+    if(!musicFile){ alert("Please select music!"); return; }
+
+    // Get camera + mic
+    stream = await navigator.mediaDevices.getUserMedia({ video:true, audio:true });
+
+    document.getElementById('preview').srcObject = stream;
+
+    // Create AudioContext to mix mic + music
+    const audioContext = new AudioContext();
+    const destination = audioContext.createMediaStreamDestination();
+
+    // Mic track
+    const micSource = audioContext.createMediaStreamSource(stream);
+    micSource.connect(destination);
+
+    // Music track
+    const musicBuffer = await musicFile.arrayBuffer();
+    const decodedMusic = await audioContext.decodeAudioData(musicBuffer);
+    const musicSource = audioContext.createBufferSource();
+    musicSource.buffer = decodedMusic;
+    musicSource.connect(destination);
+    musicSource.start();
+
+    // Combine video + mixed audio
+    const combinedStream = new MediaStream([...stream.getVideoTracks(), ...destination.stream.getAudioTracks()]);
+
+    // Preview
+    document.getElementById('preview').srcObject = combinedStream;
+
+    // Record
+    mediaRecorder = new MediaRecorder(combinedStream);
+    mediaRecorder.ondataavailable = e => { if(e.data.size>0) recordedChunks.push(e.data); };
+    mediaRecorder.start();
+
+    // Animate progress
+    progress.style.transition = "stroke-dashoffset 5s linear";
+    progress.style.strokeDashoffset = "0";
+
+    // Stop after 5 seconds
+    setTimeout(() => { 
+        mediaRecorder.stop(); 
+        progress.style.transition = "none"; 
+        progress.style.strokeDashoffset = "283";
+    }, 5000);
+
+    mediaRecorder.onstop = () => {
+        const blob = new Blob(recordedChunks,{type:'video/webm'});
+        recordedChunks = [];
+        kondio.pause();
+        const formData = new FormData();
+        formData.append("video", blob, "video_with_music.webm");
+
+        fetch("upload.php",{method:"POST",body:formData})
+            .then(res=>res.text())
+            .then(data=>alert(data));
+
+        // Stop tracks
+        stream.getTracks().forEach(t=>t.stop());
+        audioContext.close();
+    };
+}
+</script>
+
+</body>
+</html>

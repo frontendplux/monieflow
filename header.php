@@ -168,11 +168,11 @@
                         <p class="text-dark fw-light small mb-0 text-muted"> <?= htmlspecialchars($userProfile['bio'] ?? 'Hi there, am on flow') ?></p>
                     </div>
                 </a>
-                <a class="justify-content-between btn rounded-0 btn-light py-2 d-flex align-items-center" onclick="toggleMobileChat()">
+                <a href="/logout.php" class="justify-content-between btn rounded-0 btn-light py-2 d-flex align-items-center">
                     <i class="ri-user-fill"></i>
                     <div class="ms-3 overflow-hidden w-100">
                         <div class="d-flex justify-content-between">
-                        <h6 class="mb-0 fw-bold small">Log Out </h6>
+                           <h6 class="mb-0 fw-bold small">Log Out </h6>
                         </div>
                     </div>
                 </a>
