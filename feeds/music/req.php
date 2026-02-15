@@ -10,14 +10,26 @@ class music extends Main {
     public function upload() {
 
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-            exit("Invalid request");
+            $this->jsonResponse(false, "Invalid request");
         }
 
         session_start();
-        $user_id = $_SESSION['user_id'] ?? 1; // change to your auth system
+        $user_id = $_SESSION['user_id'] ?? 1;
 
-        if (!isset($_FILES['audio'])) {
-            exit("Audio file missing");
+        if (!isset($_FILES['audio']) || $_FILES['audio']['error'] !== 0) {
+            $this->jsonResponse(false, "Audio file missing");
+        }
+
+        // ===== VALIDATE AUDIO =====
+        $audio = $_FILES['audio'];
+
+        $allowedAudio = ['audio/mpeg', 'audio/mp3', 'audio/wav'];
+        if (!in_array($audio['type'], $allowedAudio)) {
+            $this->jsonResponse(false, "Only MP3/WAV allowed");
+        }
+
+        if ($audio['size'] > 20 * 1024 * 1024) { // 20MB
+            $this->jsonResponse(false, "Audio too large (Max 20MB)");
         }
 
         // ===== CREATE DIRECTORIES =====
@@ -29,48 +41,82 @@ class music extends Main {
             mkdir("uploads/covers", 0777, true);
         }
 
-        // ===== AUDIO =====
-        $audio = $_FILES['audio'];
-        $audioName = uniqid() . "_" . basename($audio['name']);
+        // ===== SAVE AUDIO =====
+        $audioExt = pathinfo($audio['name'], PATHINFO_EXTENSION);
+        $audioName = uniqid("audio_", true) . "." . $audioExt;
         $audioPath = "uploads/audio/" . $audioName;
 
-        move_uploaded_file($audio['tmp_name'], $audioPath);
+        if (!move_uploaded_file($audio['tmp_name'], $audioPath)) {
+            $this->jsonResponse(false, "Failed to upload audio");
+        }
 
-        // ===== COVER =====
+        // ===== SAVE COVER =====
         $coverPath = null;
 
         if (!empty($_FILES['cover']['tmp_name'])) {
+
             $cover = $_FILES['cover'];
-            $coverName = uniqid() . "_" . basename($cover['name']);
-            $coverPath = "uploads/covers/" . $coverName;
-            move_uploaded_file($cover['tmp_name'], $coverPath);
+
+            if ($cover['error'] === 0) {
+
+                $allowedImages = ['image/jpeg', 'image/png', 'image/webp'];
+
+                if (in_array($cover['type'], $allowedImages)) {
+
+                    $coverExt = pathinfo($cover['name'], PATHINFO_EXTENSION);
+                    $coverName = uniqid("cover_", true) . "." . $coverExt;
+                    $coverPath = "uploads/covers/" . $coverName;
+
+                    move_uploaded_file($cover['tmp_name'], $coverPath);
+                }
+            }
         }
 
-        // ===== JSON DATA =====
+        // ===== CLEAN INPUTS =====
+        $title = trim($_POST['title'] ?? '');
+        $description = trim($_POST['description'] ?? '');
+        $hashtags = trim($_POST['hashtags'] ?? '');
+        $category = trim($_POST['category'] ?? '');
+        $premium = isset($_POST['premium']) ? 1 : 0;
+
+        if (empty($title)) {
+            $this->jsonResponse(false, "Title required");
+        }
+
+        // ===== PREPARE JSON =====
         $data = [
-            "title" => $_POST['title'] ?? '',
-            "description" => $_POST['description'] ?? '',
-            "hashtags" => $_POST['hashtags'] ?? '',
-            "category" => $_POST['category'] ?? '',
-            "premium" => $_POST['premium'] ?? 0,
+            "title" => htmlspecialchars($title, ENT_QUOTES),
+            "description" => htmlspecialchars($description, ENT_QUOTES),
+            "hashtags" => htmlspecialchars($hashtags, ENT_QUOTES),
+            "category" => htmlspecialchars($category, ENT_QUOTES),
+            "premium" => $premium,
             "audio" => $audioPath,
             "cover" => $coverPath
         ];
 
         $jsonData = json_encode($data);
 
-        // ===== INSERT INTO feeds =====
+        // ===== INSERT INTO DATABASE =====
         $stmt = $this->conn->prepare(
             "INSERT INTO feeds (user_id, data, status) VALUES (?, ?, ?)"
         );
 
-        $stmt->execute([$user_id, $jsonData, "feed"]);
+        $stmt->execute([$user_id, $jsonData, "music"]);
 
-        echo "success";
+        $this->jsonResponse(true, "Music uploaded successfully");
+    }
+
+    private function jsonResponse($success, $message) {
+        header('Content-Type: application/json');
+        echo json_encode([
+            "success" => $success,
+            "message" => $message
+        ]);
+        exit;
     }
 }
 
 
-// ===== CALL CLASS =====
+// ===== RUN =====
 $music = new music($conn);
 $music->upload();
