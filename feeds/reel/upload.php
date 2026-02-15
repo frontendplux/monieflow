@@ -1,4 +1,8 @@
 <?php
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
+header("Content-Type: application/json");
+
 include __DIR__."/../../main-function.php";
 
 class ReelUpload extends Main {
@@ -10,57 +14,48 @@ class ReelUpload extends Main {
     public function upload() {
 
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-            echo json_encode([
-                "success" => false,
-                "message" => "Invalid request"
-            ]);
+            echo json_encode(["success"=>false,"message"=>"Invalid request"]);
             exit;
         }
 
-        session_start();
-        $user_id = $_SESSION['user_id'] ?? 1;
+        
+        $user_id =$this->getUserData()['data']['id'];
 
         if (!isset($_FILES['video'])) {
-            echo json_encode([
-                "success" => false,
-                "message" => "No video file"
-            ]);
+            echo json_encode(["success"=>false,"message"=>"No video file received"]);
             exit;
         }
 
-        // Create folder if not exists
-        if (!is_dir("uploads/reels")) {
-            mkdir("uploads/reels", 0777, true);
+        if (!is_dir(__DIR__."/../../uploads/reels")) {
+            mkdir(__DIR__."/../../uploads/reels", 0777, true);
         }
 
         $video = $_FILES['video'];
 
-        // Validate type
-        $allowed = ['video/webm', 'video/mp4'];
-        if (!in_array($video['type'], $allowed)) {
-            echo json_encode([
-                "success" => false,
-                "message" => "Invalid video format"
-            ]);
+        if ($video['error'] !== UPLOAD_ERR_OK) {
+            echo json_encode(["success"=>false,"message"=>"Upload error"]);
             exit;
         }
 
-        $videoName = uniqid() . ".webm";
-        $videoPath = "uploads/reels/" . $videoName;
+        $extension = pathinfo($video['name'], PATHINFO_EXTENSION);
+        $allowedExt = ['webm','mp4'];
+
+        if (!in_array(strtolower($extension), $allowedExt)) {
+            echo json_encode(["success"=>false,"message"=>"Invalid video format"]);
+            exit;
+        }
+
+        $videoName = uniqid() . "." . $extension;
+        $videoPath = __DIR__."/../../uploads/reels/" . $videoName;
 
         if (!move_uploaded_file($video['tmp_name'], $videoPath)) {
-            echo json_encode([
-                "success" => false,
-                "message" => "Upload failed"
-            ]);
+            echo json_encode(["success"=>false,"message"=>"Move failed"]);
             exit;
         }
 
-        // Save JSON data
         $data = [
             "title" => $_POST['title'] ?? '',
             "description" => $_POST['description'] ?? '',
-            "category" => $_POST['category'] ?? 'reel',
             "video" => $videoName,
             "created_at" => date("Y-m-d H:i:s")
         ];
@@ -68,15 +63,15 @@ class ReelUpload extends Main {
         $jsonData = json_encode($data);
 
         $stmt = $this->conn->prepare(
-            "INSERT INTO feeds (user_id, data, status) VALUES (?, ?, ?)"
+            "INSERT INTO feeds (user_id, category, txt, description,  data, status) VALUES (?, ?, ?, ?, ?, ?)"
         );
-
-        $stmt->execute([$user_id, $jsonData, "reel"]);
+        $stmt->execute([$user_id, $_POST['ids'], $_POST['title'], $_POST['description'],  $jsonData, "reel"]);
 
         echo json_encode([
             "success" => true,
             "message" => "Reel uploaded successfully"
         ]);
+        exit;
     }
 }
 

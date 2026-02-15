@@ -296,87 +296,6 @@ function initSammyPickers(triggerId, inputId) {
 
 
 
-// /**
-//  * SammyEmojiPicker
-//  * @param {string} triggerId - The ID of the button that opens the picker
-//  * @param {string} inputId - The ID of the input/textarea where emoji will be inserted
-//  */
-// function initSammyPickers(triggerId, inputId) {
-//     const trigger = document.getElementById(triggerId);
-//     const targetInput = document.getElementById(inputId);
-    
-//     // 1. Define Custom monieFlow Emojis (Sammy & Friends)
-//     const customEmojis = [
-//         { name: 'sammy_wave', url: 'https://cdn-icons-png.flaticon.com/512/4712/4712035.png' },
-//         { name: 'sammy_gold', url: 'https://cdn-icons-png.flaticon.com/512/2454/2454282.png' },
-//         { name: 'sammy_rocket', url: 'https://cdn-icons-png.flaticon.com/512/1356/1356479.png' },
-//         { name: 'sammy_rich', url: 'https://cdn-icons-png.flaticon.com/512/2933/2933116.png' },
-//         { name: 'sammy_love', url: 'https://cdn-icons-png.flaticon.com/512/2584/2584606.png' }
-//     ];
-
-//     // 2. Create Picker Styles dynamically
-//     const style = document.createElement('style');
-//     style.innerHTML = `
-//         .sammy-picker {
-//             position: absolute; width: 250px; background: #fff;
-//             border-radius: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.15);
-//             display: none; padding: 15px; z-index: 2000; border: 1px solid #eee;
-//         }
-//         .sammy-grid {
-//             display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px;
-//             max-height: 200px; overflow-y: auto;
-//         }
-//         .sammy-item {
-//             cursor: pointer; transition: 0.2s; padding: 5px; border-radius: 8px;
-//         }
-//         .sammy-item:hover { background: #f0f2f5; transform: scale(1.1); }
-//         .sammy-item img { width: 100%; height: auto; }
-//         .sammy-header { font-size: 12px; font-weight: 800; color: #888; margin-bottom: 10px; }
-//     `;
-//     document.head.appendChild(style);
-
-//     // 3. Create Picker Element
-//     const picker = document.createElement('div');
-//     picker.className = 'sammy-picker';
-//     picker.innerHTML = `
-//         <div class="sammy-header">SAMMY CUSTOMS</div>
-//         <div class="sammy-grid" id="sammyGrid"></div>
-//     `;
-//     document.body.appendChild(picker);
-
-//     // 4. Populate Grid
-//     const grid = picker.querySelector('#sammyGrid');
-//     customEmojis.forEach(emoji => {
-//         const div = document.createElement('div');
-//         div.className = 'sammy-item';
-//         div.innerHTML = `<img src="${emoji.url}" alt="${emoji.name}" title=":${emoji.name}:">`;
-//         div.onclick = () => {
-//             // Logic: Insert text shortcode into input
-//             const start = targetInput.selectionStart;
-//             const end = targetInput.selectionEnd;
-//             const text = targetInput.value;
-//             targetInput.value = text.slice(0, start) + ` :${emoji.name}: ` + text.slice(end);
-//             picker.style.display = 'none';
-//             targetInput.focus();
-//         };
-//         grid.appendChild(div);
-//     });
-
-//     // 5. Trigger Logic
-//     trigger.addEventListener('click', (e) => {
-//         e.stopPropagation();
-//         const rect = trigger.getBoundingClientRect();
-//         picker.style.top = `${rect.top - 260 + window.scrollY}px`;
-//         picker.style.left = `${rect.left}px`;
-//         picker.style.display = picker.style.display === 'block' ? 'none' : 'block';
-//     });
-
-//     // Close when clicking outside
-//     document.addEventListener('click', () => picker.style.display = 'none');
-//     picker.addEventListener('click', (e) => e.stopPropagation());
-// }
-
-
 
 /**
  * TikTok-Style Interaction Engine
@@ -387,7 +306,7 @@ const initInteractionEngine = () => {
     const style = document.createElement('style');
     style.innerHTML = `
         .interaction-popover {
-            position: absolute; bottom: 70px; right: 10px; margin:10px;
+            position: absolute; bottom: 70px; right: 10px; margin:5px 10px;
             background: rgba(255, 255, 255, 0.98); backdrop-filter: blur(10px);
             border: 1px solid #eee; border-radius: 1.25rem;
             box-shadow: 0 15px 35px rgba(0,0,0,0.1); z-index: 2000;

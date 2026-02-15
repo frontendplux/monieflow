@@ -38,12 +38,37 @@
             #musicSidebar { transform: translateX(100%); width: 85% !important; }
             #musicSidebar.active { transform: translateX(0); }
         }
+        #musicSidebar {
+    width: 350px;
+}
+
+@media (max-width: 768px) {
+    #musicSidebar {
+        width: 85%;
+        transform: translateX(100%);
+    }
+
+    #musicSidebar.active {
+        transform: translateX(0);
+    }
+}
+
+#text-arrange::placeholder{
+    color: cyan; font-family:cursive;
+    
+}
     </style>
 </head>
 <body class="text-white">
 
     <video id="preview" autoplay playsinline muted></video>
-
+    <div class="p-2 col-6 col-md-3 custom-interaction-group position-absolute m-3 my-5" style="z-index:2" >
+        <div>Write a comments...</div>
+        <textarea name="" id="text-arrange" style="background: none;" placeholder="what is on your mind? " id="" class="form-control main-input text-info"></textarea>
+        <div class="py-3">
+              <button type="button" class="btn btn-light pop-trigger" data-type="emoji">😀</button>
+        </div>
+    </div>
     <div class="position-relative vh-100 w-100">
         
         <button id="sidebarToggle" class="btn btn-info position-absolute end-0 top-0 m-4 d-md-none" style="z-index: 2000; border-radius: 12px;">
@@ -54,7 +79,9 @@
             <span id="recStatus" class="bg-danger px-3 py-1 rounded-pill text-uppercase fw-bolder d-none">rec</span>
         </div>
 
-        <div id="musicSidebar" class="col-md-3 glass-sidebar position-fixed end-0 top-0 bottom-0 shadow-lg">
+        <!-- <div id="musicSidebar" class="col-md-3 glass-sidebar position-fixed end-0 top-0 bottom-0 shadow-lg"> -->
+            <div id="musicSidebar" class="glass-sidebar position-fixed end-0 top-0 bottom-0 shadow-lg">
+
             <div class="p-4 overflow-y-auto h-100">
                 <div class="mb-5 pt-4 pt-md-0">
                     <h5 class="text-info fw-bold mb-1">ASAKE <span class="text-white opacity-50">/ BOSS</span></h5>
@@ -66,7 +93,7 @@
                     $data=json_decode($value['data'],true);
                     $key += 1;
                  ?>
-                    <li class="d-flex align-items-center gap-3 p-3 rounded-4 hover-bg-info-10 transition mb-3 border border-white border-opacity-10" onclick="selectTrack('<?= $value['txt'] ?? $data['title'] ?>','<?= '/uploads/audio/'.$data['audio'] ?>')">
+                    <li class="d-flex align-items-center gap-3 p-3 rounded-4 hover-bg-info-10 transition mb-3 border border-white border-opacity-10" onclick="selectTrack('<?= $value['txt'] ?? $data['title'] ?>','<?= '/uploads/audio/'.$data['audio'] ?>',<?= $value['id'] ?>)">
                         <div class="bg-<?= $key == 1 ? 'info' : 'white' ?> rounded-circle text-black fw-bold d-flex align-items-center justify-content-center" style="min-width: 35px; height: 35px; font-size: 12px;"><?= $key ?> </div>
                         <div class="flex-grow-1 overflow-hidden">
                             <img src="/uploads/covers/<?= $data['cover'] ?>" style="width:100px" alt="">
@@ -95,39 +122,54 @@
                </div>
 
                <audio src="" id="audio-lite" class="d-none"></audio>
-
-               <script>
-let isRecording = false;
-let mediaRecorder;
-let recordedChunks = [];
-let audioCtx, micSource, mp3Source, mixedStream;
-
-const bgMusic = document.getElementById('audio-lite');
-bgMusic.crossOrigin = "anonymous";
-
+<script src="/api.js"></script>
+<script>
+/* ============================
+   ELEMENTS
+============================ */
+musicblanca=0;
+const sidebar = document.getElementById('musicSidebar');
+const toggleBtn = document.getElementById('sidebarToggle');
+const toggleIcon = document.getElementById('toggleIcon');
+const recordBtn = document.getElementById('recordBtn');
 const innerCircle = document.getElementById('innerCircle');
 const recStatus = document.getElementById('recStatus');
+const preview = document.getElementById('preview');
+const bgMusic = document.getElementById('audio-lite');
+
+/* ============================
+   GLOBAL STATE
+============================ */
+
+let audioCtx;
+let mixedStream;
+let mediaRecorder;
+let recordedChunks = [];
+let isRecording = false;
+
+/* ============================
+   INIT CAMERA + MIXER
+============================ */
 
 async function initStudio() {
     try {
-
         const userStream = await navigator.mediaDevices.getUserMedia({
             video: true,
             audio: true
         });
 
-        document.getElementById('preview').srcObject = userStream;
+        preview.srcObject = userStream;
 
         audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 
-        micSource = audioCtx.createMediaStreamSource(userStream);
-        mp3Source = audioCtx.createMediaElementSource(bgMusic);
-
+        const micSource = audioCtx.createMediaStreamSource(userStream);
+        const musicSource = audioCtx.createMediaElementSource(bgMusic);
         const destination = audioCtx.createMediaStreamDestination();
 
+        // Mix mic + music
         micSource.connect(destination);
-        mp3Source.connect(destination);
-        mp3Source.connect(audioCtx.destination);
+        musicSource.connect(destination);
+        musicSource.connect(audioCtx.destination);
 
         mixedStream = new MediaStream([
             userStream.getVideoTracks()[0],
@@ -135,100 +177,142 @@ async function initStudio() {
         ]);
 
     } catch (err) {
-        console.error(err);
+        console.error("Camera error:", err);
+        droppySammy('danger','Auth Error',"Camera permission denied");
     }
 }
 
-function selectTrack(name, audio) {
+/* ============================
+   SIDEBAR TOGGLE (FIXED)
+============================ */
+
+toggleBtn.addEventListener("click", function () {
+    sidebar.classList.toggle("active");
+
+    if (sidebar.classList.contains("active")) {
+        toggleIcon.className = "ri-close-line";
+    } else {
+        toggleIcon.className = "ri-music-2-fill";
+    }
+});
+
+/* ============================
+   SELECT TRACK
+============================ */
+
+function selectTrack(name, audio, id=0) {
     bgMusic.src = audio;
     bgMusic.load();
     document.getElementById('currentTrack').innerText = name;
+   musicblanca=id;
+
+    if (window.innerWidth < 768) {
+        sidebar.classList.remove("active");
+        toggleIcon.className = "ri-music-2-fill";
+    }
 }
 
-document.getElementById('recordBtn').onclick = async () => {
+/* ============================
+   RECORD BUTTON
+============================ */
+
+recordBtn.addEventListener("click", async function () {
 
     if (!mixedStream) return;
 
-    if (!isRecording) {
+    if (isRecording) return;
 
-        if (audioCtx.state === 'suspended') await audioCtx.resume();
-
-        recordedChunks = [];
-
-        mediaRecorder = new MediaRecorder(mixedStream, {
-            mimeType: 'video/webm;codecs=vp8,opus'
-        });
-
-        mediaRecorder.ondataavailable = e => {
-            if (e.data.size > 0) recordedChunks.push(e.data);
-        };
-
-        mediaRecorder.onstop = uploadVideo;
-
-        mediaRecorder.start();
-        bgMusic.play();
-
-        innerCircle.style.transform = "scale(0.7)";
-        innerCircle.style.borderRadius = "12px";
-        recStatus.classList.remove('d-none');
-        recStatus.classList.add('rec-active');
-
-        isRecording = true;
-
-        // AUTO STOP AFTER 5 SECONDS
-        setTimeout(() => {
-            if (mediaRecorder.state !== "inactive") {
-
-                mediaRecorder.stop();
-
-                bgMusic.pause();
-                bgMusic.currentTime = 0;
-
-                innerCircle.style.transform = "scale(1)";
-                innerCircle.style.borderRadius = "50%";
-                recStatus.classList.add('d-none');
-                recStatus.classList.remove('rec-active');
-
-                isRecording = false;
-            }
-        }, 5000);
-
+    if (audioCtx.state === "suspended") {
+        await audioCtx.resume();
     }
-};
+
+    recordedChunks = [];
+
+    mediaRecorder = new MediaRecorder(mixedStream, {
+        mimeType: "video/webm;codecs=vp8,opus"
+    });
+
+    mediaRecorder.ondataavailable = function (e) {
+        if (e.data.size > 0) {
+            recordedChunks.push(e.data);
+        }
+    };
+
+    mediaRecorder.onstop = uploadVideo;
+
+    mediaRecorder.start();
+    bgMusic.play();
+
+    // UI changes
+    innerCircle.style.transform = "scale(0.7)";
+    innerCircle.style.borderRadius = "12px";
+    recStatus.classList.remove("d-none");
+    recStatus.classList.add("rec-active");
+
+    isRecording = true;
+
+    // AUTO STOP AFTER 5 SECONDS
+    setTimeout(() => {
+        if (mediaRecorder.state !== "inactive") {
+            mediaRecorder.stop();
+        }
+    }, 5000);
+});
+
+/* ============================
+   UPLOAD VIDEO
+============================ */
 
 async function uploadVideo() {
 
-    const blob = new Blob(recordedChunks, { type: 'video/webm' });
+    bgMusic.pause();
+    bgMusic.currentTime = 0;
+
+    innerCircle.style.transform = "scale(1)";
+    innerCircle.style.borderRadius = "50%";
+    recStatus.classList.add("d-none");
+    recStatus.classList.remove("rec-active");
+
+    isRecording = false;
+
+    const blob = new Blob(recordedChunks, { type: "video/webm" });
 
     const formData = new FormData();
-    formData.append("video", blob);
+    // formData.append("video", blob);
+    formData.append("video", blob, "reel.webm");
     formData.append("title", document.getElementById("currentTrack").innerText);
-    formData.append("description", "5 seconds reel");
+    formData.append("description", document.getElementById('text-arrange').value.trim());
+    formData.append("ids",musicblanca);
     formData.append("category", "reel");
 
     try {
-
         const response = await fetch("upload.php", {
             method: "POST",
             body: formData
         });
 
         const result = await response.json();
-
         if (result.success) {
-            alert("Reel uploaded successfully 🔥");
+             droppySammy('success', 'successfully uploaded',"Reel uploaded successfully 🔥");
+             setTimeout(() => {
+                window.location.href='/feeds/'
+             }, 2000);
         } else {
-            alert(result.message);
+             droppySammy('danger', 'Auth Failed',result.message || "Upload failed");
         }
 
     } catch (err) {
-        console.error(err);
-        alert("Upload failed");
+        droppySammy('danger', 'Auth Failed',"Upload error");
     }
 }
 
+/* ============================
+   START
+============================ */
+
 window.onload = initStudio;
 </script>
+
 
 </body>
 </html>
