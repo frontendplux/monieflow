@@ -114,8 +114,9 @@
 <body>
 <div class="fb-header-container mb-4">
     <div class="position-fixed w-100 top-0 p-2" style="z-index: 23390; background: #f0f8ffab;">
-        <div class="container d-flex justify-content-between " >
-            <a href="javascript:;" onclick="history.back()" class="ri-arrow-left-s-line text-decoration-none fs-3 text-dark"></a>
+        <div class="container px-0 d-flex justify-content-between " >
+            <a href="javascript:;" onclick="history.back()" class="ri-arrow-left-s-line text-decoration-none fs-3 text-dark d-flex align-items-center"> <span class="fs-6"><?= $profile['first_name'] ?> <?= $profile['last_name'] ?></span></a>
+           
         </div>
     </div>
     <div class="container px-0 px-md-5" style="margin-top: 59px;">
