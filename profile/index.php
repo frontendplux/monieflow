@@ -1,12 +1,14 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <?php include __DIR__."/../main-function.php"; ?>
     <?php 
-        $main = new main($conn);
-        if($main->isLoggedIn() === false) header('location:/');
-        $userData = $main->getUserData()['data'];
-        $profile = json_decode($userData['profile'], true);
+       include __DIR__."/req.php";
+       $new=new profile($conn); 
+        if($new->isLoggedIn() === false) header('location:/');
+        $user_id=$_GET['u'] ?? $new->getUserData()['data']['id'];
+       $data=$new->profile($user_id);
+       $profile=json_decode($data['profile'],true);
+       $flowscount=$new->selectCountsfollower_and_following($user_id);
     ?>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -112,17 +114,18 @@
 <body>
 <div class="fb-header-container mb-4">
     <div class="position-fixed w-100 top-0 p-2" style="z-index: 23390; background: #f0f8ffab;">
-        <div class="container d-flex justify-content-between px-5" >
+        <div class="container d-flex justify-content-between " >
             <a href="javascript:;" onclick="history.back()" class="ri-arrow-left-s-line text-decoration-none fs-3 text-dark"></a>
         </div>
     </div>
     <div class="container px-0 px-md-5" style="margin-top: 59px;">
         <img src="https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=1200&q=80" class="fb-cover" alt="Cover">
+
         <div class="d-md-flex text-center text-md-start align-items-end fb-profile-bottom px-4">
             <img src="/uploads/<?= $profile['profile_pic'] ?>" class="fb-avatar me-3 shadow-sm" alt="Avatar">
             <div class="mb-2">
                 <h1 class="fw-bold mb-0 fs-5"><?= $profile['first_name'] ?> <?= $profile['last_name'] ?></h1>
-                <p class="text-secondary fw-bold"><span>1.2K Follower</span>  <span class="ms-2">1.2K Following</span></p>
+                <p class="text-secondary fw-bold"><span><?= $flowscount['followers'] ?> .Follower</span>  <span class="ms-2"><?= $flowscount['following'] ?> .Following</span></p>
             </div>
             <div class="ms-auto mb-3">
                 <a href="/feeds/create.php" class="btn btn-primary fw-bold px-3"><i class="ri-add-line"></i> Add to Story</a>
