@@ -61,7 +61,9 @@
 </head>
 <body class="text-white">
 
-    <video id="preview" autoplay playsinline muted></video>
+
+         
+    <video id="preview" autoplay playsinline muted></video> 
     <div class="p-2 col-6 col-md-3 custom-interaction-group position-absolute m-3 my-5" style="z-index:2" >
         <div>Write a comments...</div>
         <textarea name="" id="text-arrange" style="background: none;" placeholder="what is on your mind? " id="" class="form-control main-input text-info"></textarea>
@@ -74,7 +76,6 @@
         <button id="sidebarToggle" class="btn btn-info position-absolute end-0 top-0 m-4 d-md-none" style="z-index: 2000; border-radius: 12px;">
             <i id="toggleIcon" class="ri-music-2-fill"></i>
         </button>
-
         <div class="position-absolute start-0 top-0 m-4">
             <span id="recStatus" class="bg-danger px-3 py-1 rounded-pill text-uppercase fw-bolder d-none">rec</span>
         </div>
@@ -119,7 +120,10 @@
                     <p class="text-info mb-1" style="font-size: 12px;">Now Mixing:</p>
                     <p id="currentTrack" class="text-white fw-bold mb-0">None Selected</p>
                 </div>
-               </div>
+               </div>  
+    <div class="px-0 position-fixed top-0 w-100 p-3 py-2" style="z-index: 30000;">
+                <a href="javascript:;" onclick="window.close()" class="text-white text-decoration-none container" > <span class="fs-3 ri-arrow-left-s-line text white fw-bolder text-uppercase"></span></a>
+    </div>
 
                <audio src="" id="audio-lite" class="d-none"></audio>
 <script src="/api.js"></script>
