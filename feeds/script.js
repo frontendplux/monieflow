@@ -29,7 +29,7 @@ async function fetchfeeds() {
     body: JSON.stringify({ action: "feeds", limit: feedup })
   }).then(res => res.json());
   promo_feeds(req.feed, 18, 20);
-  promo_reels(req.reels,0,15);
+  // promo_reels(req.reels,0,15);
   promo_market(req.market, 10, 20);
   flowads_slide();
   promo_feeds(req.feed, 12, 18);

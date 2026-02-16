@@ -53,53 +53,12 @@ class ReelUpload extends Main {
             exit;
         }
 
-
-
-
-
-        /* ============================
-   HANDLE REEL COVER IMAGE
-============================ */
-$coverName = null;
-
-if (isset($_FILES['cover']) && $_FILES['cover']['error'] === UPLOAD_ERR_OK) {
-
-    if (!is_dir(__DIR__."/../../uploads/reel_covers")) {
-        mkdir(__DIR__."/../../uploads/reel_covers", 0777, true);
-    }
-
-    $coverExt = pathinfo($_FILES['cover']['name'], PATHINFO_EXTENSION);
-    $allowedImageExt = ['jpg','jpeg','png'];
-
-    if (in_array(strtolower($coverExt), $allowedImageExt)) {
-
-        $coverName = uniqid() . "." . $coverExt;
-        $coverPath = __DIR__."/../../uploads/reel_covers/" . $coverName;
-
-        move_uploaded_file($_FILES['cover']['tmp_name'], $coverPath);
-    }
-}
-
-
-
-
-        // $data = [
-        //     "title" => $_POST['title'] ?? '',
-        //     "description" => $_POST['description'] ?? '',
-        //     "video" => $videoName,
-        //     "created_at" => date("Y-m-d H:i:s")
-        // ];
-
-$data = [
-    "title" => $_POST['title'] ?? '',
-    "description" => $_POST['description'] ?? '',
-    "video" => $videoName,
-    "cover" => $coverName,
-    "created_at" => date("Y-m-d H:i:s")
-];
-
-
-
+        $data = [
+            "title" => $_POST['title'] ?? '',
+            "description" => $_POST['description'] ?? '',
+            "video" => $videoName,
+            "created_at" => date("Y-m-d H:i:s")
+        ];
 
         $jsonData = json_encode($data);
 

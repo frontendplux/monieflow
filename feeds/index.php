@@ -8,6 +8,8 @@
         if($main->isLoggedIn() === false) header('location:/');
         $userData = $main->getUserData()['data'];
         $profile = json_decode($userData['profile'], true);
+        $reels=$main->feeds(0,'reel');
+        print_r($main->feeds(0,'reel'))
     ?>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9, user-scalable=1">
@@ -383,7 +385,34 @@
                         <!-- Stories/Reels Section (Horizontal Scroll) -->
                         <div class="container px-0">
                             <div id="reelifield" class="d-flex gap-3 pb-3 overflow-auto" style="scrollbar-width: none; -ms-overflow-style: none;">
-                                
+                                <a href="/feeds/reel/create.php" target="_blank"  class="card text-decoration-none border-0 shadow-sm flex-shrink-0" style="width: 130px; border-radius: 15px; overflow: hidden;">
+                                    <div style="height: 150px; background: url('https://picsum.photos/200/300?random=1') center/cover;"></div>
+                                    <div class="card-body p-0 position-relative text-center" style="height: 60px; background: #fff;">
+                                        <div class="position-absolute translate-middle-x start-50" style="top: -18px;">
+                                            <div class="bg-primary border border-3 border-white rounded-circle d-flex align-items-center justify-content-center" style="width: 36px; height: 36px;">
+                                                <i class="ri-add-line text-white fs-4"></i>
+                                            </div>
+                                        </div>
+                                        <div class="mt-3 small fw-bold text-dark">Create Reel</div>
+                                    </div>
+                                </a>
+                                <?php foreach ($reels as $key => $reel):
+                                    $profile=json_decode($reel['profile'],true);
+                                    $data=json_decode($reel['data'],true);
+                                 ?>
+                                    <a href="/feeds/reel/?r=<?= $reel['feed_id'] ?>" class="position-relative flex-shrink-0 shadow-sm user-reel" style="width: 130px; height: 210px; border-radius: 15px; overflow: hidden;">
+                                        <div class="h-100 w-100" style="background: url('/uploads/reel_covers/<?= $data['cover'] ?>') center/cover;"></div>
+                                        <div class="position-absolute top-0 start-0 w-100 h-100 d-flex flex-column justify-content-between p-2" 
+                                            style="background: linear-gradient(to bottom, rgba(0,0,0,0.3) 0%, rgba(0,0,0,0) 50%, rgba(0,0,0,0.8) 100%);">
+                                            <div class="avatar-ring">
+                                                <img src="/uploads/<?= $profile['profile_pic'] ?>" class="rounded-circle border border-2 border-primary" width="35" height="35">
+                                            </div>
+                                            <div class="blur-footer rounded-2 py-1 px-2">
+                                                <div class="text-white small fw-semibold text-truncate" style="font-size: 0.75rem;"><?= $profile['username'] ?></div>
+                                            </div>
+                                         </div>
+                                    </a>
+                                <?php endforeach; ?>
                             </div>
                         </div>
                         <div class="composer-card mb-3">

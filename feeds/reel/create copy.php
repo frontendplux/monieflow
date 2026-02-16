@@ -277,51 +277,15 @@ async function uploadVideo() {
 
     const blob = new Blob(recordedChunks, { type: "video/webm" });
 
-
-/* ============================
-   GENERATE REEL COVER IMAGE
-============================ */
-const videoURL = URL.createObjectURL(blob);
-const tempVideo = document.createElement("video");
-tempVideo.src = videoURL;
-tempVideo.muted = true;
-
-await new Promise(resolve => {
-    tempVideo.onloadeddata = () => {
-        tempVideo.currentTime = 0.5; // capture frame at 0.5s
-        resolve();
-    };
-});
-
-await new Promise(resolve => {
-    tempVideo.onseeked = resolve;
-});
-
-const canvas = document.createElement("canvas");
-canvas.width = tempVideo.videoWidth;
-canvas.height = tempVideo.videoHeight;
-
-const ctx = canvas.getContext("2d");
-ctx.drawImage(tempVideo, 0, 0, canvas.width, canvas.height);
-
-const thumbnailBlob = await new Promise(resolve =>
-    canvas.toBlob(resolve, "image/jpeg", 0.85)
-);
-
-
-
-
-
     const formData = new FormData();
     // formData.append("video", blob);
     formData.append("video", blob, "reel.webm");
-    formData.append("cover", thumbnailBlob, "reel-cover.jpg");
     formData.append("title", document.getElementById("currentTrack").innerText);
     formData.append("description", document.getElementById('text-arrange').value.trim());
     formData.append("ids",musicblanca);
     formData.append("category", "reel");
+
     try {
-    droppySammy('info', 'Quick Information',"dont leave while uploading, page will close automatically");
         const response = await fetch("upload.php", {
             method: "POST",
             body: formData
@@ -331,8 +295,7 @@ const thumbnailBlob = await new Promise(resolve =>
         if (result.success) {
              droppySammy('success', 'successfully uploaded',"Reel uploaded successfully 🔥");
              setTimeout(() => {
-                // window.location.href='/feeds/'
-                 window.close();
+                window.location.href='/feeds/'
              }, 2000);
         } else {
              droppySammy('danger', 'Auth Failed',result.message || "Upload failed");
