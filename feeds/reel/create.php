@@ -122,7 +122,7 @@
                 </div>
                </div>  
     <div class="px-0 position-fixed top-0 w-100 p-3 py-2" style="z-index: 30000;">
-                <a href="javascript:;" onclick="window.close()" class="text-white text-decoration-none container" > <span class="fs-3 ri-arrow-left-s-line text white fw-bolder text-uppercase"></span></a>
+                <a href="javascript:;" onclick="history.back()" class="text-white text-decoration-none container" > <span class="fs-3 ri-arrow-left-s-line text white fw-bolder text-uppercase"></span></a>
     </div>
 
                <audio src="" id="audio-lite" class="d-none"></audio>
@@ -281,7 +281,7 @@ async function uploadVideo() {
 
     const blob = new Blob(recordedChunks, { type: "video/webm" });
 
-
+ droppySammy('info', 'Quick Information',"dont leave while uploading, page will close automatically");
 /* ============================
    GENERATE REEL COVER IMAGE
 ============================ */
@@ -325,7 +325,6 @@ const thumbnailBlob = await new Promise(resolve =>
     formData.append("ids",musicblanca);
     formData.append("category", "reel");
     try {
-    droppySammy('info', 'Quick Information',"dont leave while uploading, page will close automatically");
         const response = await fetch("upload.php", {
             method: "POST",
             body: formData
@@ -335,8 +334,7 @@ const thumbnailBlob = await new Promise(resolve =>
         if (result.success) {
              droppySammy('success', 'successfully uploaded',"Reel uploaded successfully 🔥");
              setTimeout(() => {
-                // window.location.href='/feeds/'
-                 window.close();
+                window.location.href='/feeds/'
              }, 2000);
         } else {
              droppySammy('danger', 'Auth Failed',result.message || "Upload failed");

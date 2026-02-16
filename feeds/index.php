@@ -9,7 +9,7 @@
         $userData = $main->getUserData()['data'];
         $profile = json_decode($userData['profile'], true);
         $reels=$main->feeds(0,'reel');
-        print_r($main->feeds(0,'reel'))
+        // print_r($main->feeds(0,'reel'))
     ?>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9, user-scalable=1">
@@ -385,7 +385,7 @@
                         <!-- Stories/Reels Section (Horizontal Scroll) -->
                         <div class="container px-0">
                             <div id="reelifield" class="d-flex gap-3 pb-3 overflow-auto" style="scrollbar-width: none; -ms-overflow-style: none;">
-                                <a href="/feeds/reel/create.php" target="_blank"  class="card text-decoration-none border-0 shadow-sm flex-shrink-0" style="width: 130px; border-radius: 15px; overflow: hidden;">
+                                <a href="/feeds/reel/create.php"  class="card text-decoration-none border-0 shadow-sm flex-shrink-0" style="width: 130px; border-radius: 15px; overflow: hidden;">
                                     <div style="height: 150px; background: url('https://picsum.photos/200/300?random=1') center/cover;"></div>
                                     <div class="card-body p-0 position-relative text-center" style="height: 60px; background: #fff;">
                                         <div class="position-absolute translate-middle-x start-50" style="top: -18px;">
