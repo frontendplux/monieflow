@@ -105,26 +105,11 @@
             </a>
         </div>
 </div>
-<div class="container" style="margin-top:75px;">
+<div class="container" style="margin-top:50px;">
     <div class="row">
         <div class="col-md-3 d-none d-md-block friends-sidebar">
             <h4 class="fw-bold mb-4">Friends</h4>
-            <nav>
-                <?php foreach(
-                    [
-                        ['ri-user-follow-fill','Home', 'friends/'],
-                        ['ri-user-received-fill','Friend Requests', 'friends/friend-request.php'],
-                        ['ri-user-add-fill','Suggestions','friends/Suggestions.php'],
-                        ['ri-group-fill','All Friends', 'friends/all-friends.php'],
-                        ['ri-cake-2-fill','Birthdays', 'friends/birthday.php']
-                    ]
-                        as $key => $menu
-                ): $key += 1 ?>
-                <a href="/<?= $menu[2]; ?>" class="nav-link-custom <?= $page[1] == $key ? 'active' : '' ?>  my-2">
-                    <i class="<?= $menu[0]; ?>"></i> <?= $menu[1]; ?>
-                </a>
-                <?php endforeach; ?>
-            </nav>
+            <?php include __DIR__."/sidebar.php"; ?>
         </div>
 
         <div class="col-12 col-md-9 p-4">
@@ -133,7 +118,7 @@
                 <!-- <a href="#" class="text-decoration-none">See All</a> -->
             </div>
 
-            <div class="row g-3" id="roots">
+            <div class="row" id="roots">
                 <?php for($i=1; $i<=8; $i++): ?>
                 <div class="col-6 placeholder-glow col-sm-4 col-lg-4 col-xl-3" id="friend-102">
                     <div class="friend-card">
