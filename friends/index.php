@@ -169,7 +169,7 @@ function fetchfriends() {
   const formData = new FormData();
    formData.append('action','get_friend_list_to_follow')
    formData.append('limit',limit )
-   limit +=20
+   limit +=12
      fetch('/friends/req.php', {
     method: 'POST',
     body: formData
@@ -181,7 +181,7 @@ function fetchfriends() {
     const data=datas.map(e=>{
        const profile=JSON.parse(e.profile);
       return  ` 
-                <div class="col-6 col-sm-4 col-lg-3 col-xl-2" id="friend-${e.id}">
+                <div class="col-6 col-sm-4 col-lg-3 col-xl-3" id="friend-${e.id}">
                     <div class="friend-card">
                         <img src="/uploads/${profile.profile_pic}" class="friend-img">
                         <div class="friend-info">
@@ -194,7 +194,7 @@ function fetchfriends() {
                 </div>
         `
     }).join('');
-    document.getElementById('roots').insertAdjacentHTML('afterbegin',data);
+    document.getElementById('roots').innerHTML=data;
     console.log('Success:', data);
   })
 }

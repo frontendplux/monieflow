@@ -57,7 +57,7 @@ public function flows($limit = 0) {
                 SELECT 1 FROM flows f WHERE f.user_id = u.id AND f.flow = ?)
 
             ORDER BY id DESC
-            LIMIT ?, 20";
+            LIMIT ?, 12";
 
     $smt = $this->conn->prepare($sql);
 
