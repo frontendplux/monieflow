@@ -7,6 +7,7 @@
         if($main->isLoggedIn() === false) header('location:/');
         $userData = $main->getUserData()['data'];
         $profile = json_decode($userData['profile'], true);
+        $page=['friends', 1]
     ?>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -97,43 +98,39 @@
 </head>
 <body>
 
-<header class="sticky-top bg-white border-bottom d-flex align-items-center justify-content-between px-3" style="height: 56px; z-index: 1050;">
-    <div class="d-flex align-items-center">
-        <div class="brand-logo me-3" style="font-weight: 800; font-size: 1.5rem; color: var(--fb-blue);">monieFlow</div>
-    </div>
-    <div class="d-flex gap-2">
-        <div class="fb-nav-icon bg-light rounded-circle p-2"><i class="ri-settings-4-fill"></i></div>
-        <img src="https://i.pravatar.cc/150?u=<?= $userData['id'] ?>" class="rounded-circle" width="40">
-    </div>
-</header>
-
-<div class="container my-3">
+<div class="position-fixed w-100 top-0 p-2" style="z-index: 23390; background: #f0f8ffab;">
+        <div class="container px-0 d-flex justify-content-between " >
+            <a href="javascript:;" onclick="history.back()" class="ri-arrow-left-s-line text-decoration-none fs-3 text-dark d-flex align-items-center"> 
+                <span class="fs-3 fw-medium"><?=  $page[0] ?> </span>
+            </a>
+        </div>
+</div>
+<div class="container" style="margin-top:75px;">
     <div class="row">
         <div class="col-md-3 d-none d-md-block friends-sidebar">
             <h4 class="fw-bold mb-4">Friends</h4>
             <nav>
-                <a href="#" class="nav-link-custom active">
-                    <i class="ri-user-follow-fill"></i> Home
+                <?php foreach(
+                    [
+                        ['ri-user-follow-fill','Home', 'friends/'],
+                        ['ri-user-received-fill','Friend Requests', 'friends/friend-request.php'],
+                        ['ri-user-add-fill','Suggestions','friends/Suggestions.php'],
+                        ['ri-group-fill','All Friends', 'friends/all-friends.php'],
+                        ['ri-cake-2-fill','Birthdays', 'friends/birthday.php']
+                    ]
+                        as $key => $menu
+                ): $key += 1 ?>
+                <a href="/<?= $menu[2]; ?>" class="nav-link-custom <?= $page[1] == $key ? 'active' : '' ?>  my-2">
+                    <i class="<?= $menu[0]; ?>"></i> <?= $menu[1]; ?>
                 </a>
-                <a href="#" class="nav-link-custom">
-                    <i class="ri-user-received-fill"></i> Friend Requests
-                </a>
-                <a href="#" class="nav-link-custom">
-                    <i class="ri-user-add-fill"></i> Suggestions
-                </a>
-                <a href="#" class="nav-link-custom">
-                    <i class="ri-group-fill"></i> All Friends
-                </a>
-                <a href="#" class="nav-link-custom">
-                    <i class="ri-cake-2-fill"></i> Birthdays
-                </a>
+                <?php endforeach; ?>
             </nav>
         </div>
 
         <div class="col-12 col-md-9 p-4">
             <div class="d-flex justify-content-between align-items-center mb-4">
                 <h5 class="fw-bold">People You May Know</h5>
-                <a href="#" class="text-decoration-none">See All</a>
+                <!-- <a href="#" class="text-decoration-none">See All</a> -->
             </div>
 
             <div class="row g-3" id="roots">
@@ -165,40 +162,102 @@ var limit=0
 window.addEventListener('DOMContentLoaded',e=>{
     fetchfriends();
 })
+function preloader() {
+  document.getElementById('roots').innerHTML = `
+    ${Array(12).fill(null).map(() => {
+      return `
+        <div class="col-6 col-sm-4 col-lg-4 col-xl-3 placeholder-wave">
+          <div class="friend-card">
+            <!-- Image placeholder -->
+            <div class="friend-img col-12 placeholder" style="height:150px;"></div>
+            
+            <div class="friend-info">
+              <!-- Name placeholder -->
+              <div class="fw-bold text-truncate mb-1 placeholder col-8"></div>
+              
+              <!-- Mutual friends placeholder -->
+              <div class="text-muted w-100 small mb-2 placeholder col-6"></div>
+              
+              <!-- Buttons placeholders -->
+              <button class="btn btn-secondary col-12 my-2 disabled placeholder col-6"></button>
+              <button class="btn btn-secondary col-12 border disabled placeholder col-6"></button>
+            </div>
+          </div>
+        </div>
+      `;
+    }).join('')}
+  `;
+}
 function fetchfriends() {
+  preloader();
   const formData = new FormData();
-   formData.append('action','get_friend_list_to_follow')
-   formData.append('limit',limit )
-   limit +=12
-     fetch('/friends/req.php', {
+  formData.append('action', 'get_friend_list_to_follow');
+  formData.append('limit', limit);
+
+  fetch('/friends/req.php', {
     method: 'POST',
     body: formData
   })
-  .then(response => response.json()) // or response.json()
+  .then(response => response.json())
   .then(datas => {
     console.log(datas);
-    
-    const data=datas.map(e=>{
-       const profile=JSON.parse(e.profile);
-      return  ` 
-                <div class="col-6 col-sm-4 col-lg-3 col-xl-3" id="friend-${e.id}">
-                    <div class="friend-card">
-                        <img src="/uploads/${profile.profile_pic}" class="friend-img">
-                        <div class="friend-info">
-                            <div class="fw-bold text-truncate mb-1">${profile.first_name}  ${profile.last_name}</div>
-                            <div class="text-muted small mb-2">5 mutual friends</div>
-                            <button class="btn btn-primary btn-action" onclick="sendReq(${e.id})">Add Friend</button>
-                            <button class="btn btn-light btn-action border" onclick="removeSug(${e.id})">Remove</button>
-                        </div>
-                    </div>
-                </div>
-        `
-    }).join('');
-    document.getElementById('roots').innerHTML=data;
-    console.log('Success:', data);
+
+    const data = datas.map(e => {
+      const profile = JSON.parse(e.profile);
+      return ` 
+        <div class="col-6 col-sm-4 col-lg-3 col-xl-3" id="friend-${e.id}">
+          <div class="friend-card">
+            <img src="/uploads/${profile.profile_pic}" class="friend-img">
+            <div class="friend-info">
+              <div class="fw-bold text-truncate mb-1">${profile.first_name} ${profile.last_name}</div>
+              <div class="text-muted small mb-2">5 mutual friends</div>
+              <button class="btn btn-primary btn-action" onclick="sendReq(${e.id})">Add Friend</button>
+              <button class="btn btn-light btn-action border" onclick="removeSug(${e.id})">Remove</button>
+            </div>
+          </div>
+        </div>
+      `;
+    }).join('') + `
+    <style>
+      .btn-gradient {
+        background: linear-gradient(45deg, #0d6efd, #0dcaf0);
+        border: none;
+        transition: transform 0.2s, box-shadow 0.2s;
+      }
+      .btn-gradient:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 15px rgba(13, 110, 253, 0.4);
+        color: white;
+      }
+    </style>
+
+    <div class="d-flex align-items-center justify-content-center justify-content-md-end gap-3">
+      <button class="btn btn-light border text-muted px-4" onclick="previewFriends()">
+        Preview
+      </button>
+
+      <button class="btn btn-gradient text-white fw-bold px-5 py-2 rounded-3" onclick="nextfriendpage()">
+        Next Step
+      </button>
+    </div>`;
+
+    document.getElementById('roots').innerHTML = data;
   })
+  .catch(error => {
+    console.error('Error fetching friends:', error);
+    document.getElementById('roots').innerHTML = '<p>Failed to load friends.</p>';
+  });
 }
 
+window.nextfriendpage = () => {
+  limit += 12;
+  fetchfriends();
+};
+
+window.previewFriends = () => {
+  limit = Math.max(0, limit - 12);
+  fetchfriends();
+};
 
     function sendReq(id) {
         const card = document.querySelector(`#friend-${id} .btn-primary`);
