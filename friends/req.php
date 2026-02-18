@@ -79,6 +79,21 @@ public function flows($limit = 0) {
     return $smt->get_result()->fetch_all(MYSQLI_ASSOC);
 }
 
+public function remove_friends($id = 0){
+    $user_id=$this->getUserData()['data']['id'];
+    $smt=$this->conn->prepare("delete from flows where (user_id=? and flow =?) or (user_id=? and flow=?) limit 1");
+    $smt->bind_param('iiii',$user_id,$id,$id,$user_id);
+    $smt->execute();
+}
+
+public function add_friends($id = 0){
+    $user_id=$this->getUserData()['data']['id'];
+    $smt=$this->conn->prepare("INSERT INTO flows(user_id,flow) values(?,?)");
+    $smt->bind_param('ii',$user_id,$id);
+    $smt->execute();
+}
+
+
 
 }
 
@@ -92,11 +107,13 @@ switch ($route) {
    case 'get_friend_list_to_follow':
       echo json_encode($new->flows($_POST['limit']));
       break;
-    case 'feeds':
+    case 'remove-friends':
+        $new->remove_friends($_POST['id']);
         break;
-         case 'like_post':
-          echo  $new->like_post($hooks['feed_id'], $hooks['status']);
-         break;
+
+    case 'add_friends':
+    echo  $new->add_friends($_POST['id']);
+    break;
 
 
     default:

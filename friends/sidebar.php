@@ -1,11 +1,10 @@
 <nav>
     <?php foreach(
         [
-            ['ri-user-follow-fill','Home', 'friends/'],
-            ['ri-user-received-fill','Friend Requests', 'friends/friend-request.php'],
-            ['ri-user-add-fill','Suggestions','friends/Suggestions.php'],
             ['ri-group-fill','All Friends', 'friends/all-friends.php'],
-            ['ri-cake-2-fill','Birthdays', 'friends/birthday.php']
+            ['ri-user-received-fill','Friend Requests', 'friends/friend-request.php'],
+            // ['ri-user-add-fill','Suggestions','friends/Suggestions.php'],
+            // ['ri-cake-2-fill','Birthdays', 'friends/birthday.php']
         ]
             as $key => $menu
     ): $key += 1 ?>

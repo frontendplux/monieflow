@@ -105,7 +105,7 @@
             </a>
         </div>
 </div>
-<div class="container p-0" style="margin-top:50px;">
+<div class="container p-0 p-md-3" style="margin-top:50px;">
     <div class="d-flex flex-wrap">
         <div class="col-md-3 d-none d-md-block friends-sidebar">
             <h4 class="fw-bold mb-4">Friends</h4>
@@ -114,13 +114,30 @@
 
         <div class="col-12 col-md-9 p-2">
             <div class="d-flex justify-content-between align-items-center mb-4">
-                <h5 class="fw-bold">People You May Know</h5>
+                <h5 class="fw-bold d-md-block d-none">My Friends Lists  </h5>
+                <nav class="d-flex gap-3 d-md-none overflow-auto">
+    <?php foreach(
+        [
+            ['ri-user-follow-fill','Home', 'friends/'],
+            ['ri-user-received-fill','Friend&nbsp;Requests', 'friends/friend-request.php'],
+            ['ri-user-add-fill','Suggestions','friends/Suggestions.php'],
+            ['ri-group-fill','All&nbsp;Friends', 'friends/all-friends.php'],
+            ['ri-cake-2-fill','Birthdays', 'friends/birthday.php']
+        ]
+            as $key => $menu
+    ): $key += 1 ?>
+    <a href="/<?= $menu[2]; ?>" class="d-flex align-items-center gap-2 text-decoration-none btn btn-light rounded-pill <?= $page[1] == $key ? 'active' : '' ?>  my-2">
+        <i class="<?= $menu[0]; ?>"></i> <?= $menu[1]; ?>
+    </a>
+    <?php endforeach; ?>
+</nav>
+                <!-- lists People You May Know -->
                 <!-- <a href="#" class="text-decoration-none">See All</a> -->
             </div>
 
-            <div class="d-flex flex-wrap p-0" id="roots">
+            <div class="d-flex flex-wrap" id="roots">
                 <?php for($i=1; $i<=8; $i++): ?>
-                <div class="col-6 placeholder-glow col-sm-4 col-lg-4 col-xl-3" id="friend-102">
+                <div class="col-6 placeholder-glow p-1 col-sm-4 col-lg-4 col-xl-3" id="friend-102">
                     <div class="friend-card">
                         <!-- Image placeholder -->
                         <div class="friend-img col-12 placeholder" style="height:150px;"></div>
@@ -173,7 +190,7 @@ function preloader() {
     }).join('')}
   `;
 }
-function fetchfriends() {
+function fetchfriends(status) {
   preloader();
   const formData = new FormData();
   formData.append('action', 'get_friend_list_to_follow');
@@ -187,46 +204,52 @@ function fetchfriends() {
   .then(datas => {
     console.log(datas);
 
-    const data = datas.map(e => {
+    const cards = datas.map(e => {
       const profile = JSON.parse(e.profile);
-      return ` 
-        <div class="col-6 col-sm-4 col-lg-3 col-xl-3 p-1"  id="friend-${e.id}">
-          <div class="friend-card">
-            <img src="/uploads/${profile.profile_pic}" class="friend-img">
-            <div class="friend-info">
-              <div class="fw-bold text-truncate mb-1">${profile.first_name} ${profile.last_name}</div>
-              <div class="text-muted small mb-2">5 mutual friends</div>
-              <button class="btn btn-primary btn-action" onclick="sendReq(${e.id})">Add Friend</button>
-              <button class="btn btn-light btn-action border" onclick="removeSug(${e.id})">Remove</button>
+      if (e.status === status) {
+        return ` 
+          <div class="col-6 col-sm-4 col-lg-3 col-xl-3 p-1" id="friend-${e.id}">
+            <div class="friend-card">
+              <img src="/uploads/${profile.profile_pic}" class="friend-img">
+              <div class="friend-info">
+                <div class="fw-bold text-truncate mb-1">${profile.first_name} ${profile.last_name}</div>
+                <div class="text-muted small mb-2">${e.mutual_count ? `${e.mutual_count} mutual friends` : ''}</div>
+                <a href="/profile/?u=${e.id}" class="btn btn-primary btn-action">View Profile</a>
+                <button class="btn btn-light btn-action border" onclick="removeSug(${e.id})">Remove Friend</button>
+              </div>
             </div>
           </div>
-        </div>
-      `;
-    }).join('') + `
-    <style>
-      .btn-gradient {
-        background: linear-gradient(45deg, #0d6efd, #0dcaf0);
-        border: none;
-        transition: transform 0.2s, box-shadow 0.2s;
+        `;
       }
-      .btn-gradient:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 4px 15px rgba(13, 110, 253, 0.4);
-        color: white;
-      }
-    </style>
+      return '';
+    }).join('');
 
-    <div class="d-flex align-items-center justify-content-center justify-content-md-end gap-3 w-100 my-4">
-      <button class="btn btn-light border text-muted px-4" onclick="previewFriends()">
-        Preview
-      </button>
+    const navigation = `
+      <style>
+        .btn-gradient {
+          background: linear-gradient(45deg, #0d6efd, #0dcaf0);
+          border: none;
+          transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .btn-gradient:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 4px 15px rgba(13, 110, 253, 0.4);
+          color: white;
+        }
+      </style>
 
-      <button class="btn btn-gradient text-white fw-bold px-5 py-2 rounded-3" onclick="nextfriendpage()">
-        Next Step
-      </button>
-    </div>`;
+      <div class="d-flex align-items-center justify-content-center justify-content-md-end gap-3 w-100 my-4">
+        <button class="btn btn-light border text-muted px-4" onclick="previewFriends()">
+          Preview
+        </button>
 
-    document.getElementById('roots').innerHTML = data;
+        <button class="btn btn-gradient text-white fw-bold px-5 py-2 rounded-3" onclick="nextfriendpage()">
+          Next Step
+        </button>
+      </div>
+    `;
+
+    document.getElementById('roots').innerHTML = cards + navigation;
   })
   .catch(error => {
     console.error('Error fetching friends:', error);
@@ -244,18 +267,22 @@ window.previewFriends = () => {
   fetchfriends();
 };
 
-    function sendReq(id) {
-        const card = document.querySelector(`#friend-${id} .btn-primary`);
-        card.innerHTML = '<i class="ri-check-line"></i> Requested';
-        card.classList.replace('btn-primary', 'btn-secondary');
-        card.disabled = true;
-    }
+    // function sendReq(id) {
+    //     const card = document.querySelector(`#friend-${id} .btn-primary`);
+    //     card.innerHTML = '<i class="ri-check-line"></i> Requested';
+    //     card.classList.replace('btn-primary', 'btn-secondary');
+    //     card.disabled = true;
+    // }
 
     function removeSug(id) {
         const el = document.getElementById('friend-' + id);
         el.style.opacity = '0';
         el.style.transform = 'scale(0.8)';
         setTimeout(() => el.remove(), 300);
+        const formData=new FormData();
+        formData('action', 'remove-friends');
+        formData('id', id);
+        fetch('/friends/req.php', {method:'post', body:formData});
     }
 </script>
 
