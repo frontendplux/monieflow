@@ -136,40 +136,21 @@
                 <a href="#" class="text-decoration-none">See All</a>
             </div>
 
-            <div class="row g-3">
-                <div class="col-6 col-sm-4 col-lg-3 col-xl-3" id="friend-101">
+            <div class="row g-3" id="roots">
+                <?php for($i=1; $i<=8; $i++): ?>
+                <div class="col-6 placeholder-glow col-sm-4 col-lg-4 col-xl-3" id="friend-102">
                     <div class="friend-card">
-                        <img src="https://i.pravatar.cc/150?u=101" class="friend-img">
+                        <!-- Image placeholder -->
+                        <div class="friend-img col-12 placeholder" style="height:150px;"></div>
                         <div class="friend-info">
-                            <div class="fw-bold text-truncate mb-1">Dianne Russell</div>
-                            <div class="text-muted small mb-2">12 mutual friends</div>
-                            <button class="btn btn-primary btn-action" onclick="sendReq(101)">Add Friend</button>
-                            <button class="btn btn-light btn-action border" onclick="removeSug(101)">Remove</button>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="col-6 col-sm-4 col-lg-3 col-xl-2" id="friend-102">
-                    <div class="friend-card">
-                        <img src="https://i.pravatar.cc/150?u=102" class="friend-img">
-                        <div class="friend-info">
-                            <div class="fw-bold text-truncate mb-1">Wade Warren</div>
-                            <div class="text-muted small mb-2">2 mutual friends</div>
-                            <button class="btn btn-primary btn-action" onclick="sendReq(102)">Add Friend</button>
-                            <button class="btn btn-light btn-action border" onclick="removeSug(102)">Remove</button>
-                        </div>
-                    </div>
-                </div>
-
-                <?php for($i=103; $i<=108; $i++): ?>
-                <div class="col-6 col-sm-4 col-lg-3 col-xl-2" id="friend-<?= $i ?>">
-                    <div class="friend-card">
-                        <img src="https://i.pravatar.cc/150?u=<?= $i ?>" class="friend-img">
-                        <div class="friend-info">
-                            <div class="fw-bold text-truncate mb-1">User <?= $i ?></div>
-                            <div class="text-muted small mb-2">5 mutual friends</div>
-                            <button class="btn btn-primary btn-action" onclick="sendReq(<?= $i ?>)">Add Friend</button>
-                            <button class="btn btn-light btn-action border" onclick="removeSug(<?= $i ?>)">Remove</button>
+                        <div class="fw-bold text-truncate mb-1 placeholder col-8"></div>
+                        
+                        <!-- Mutual friends placeholder -->
+                        <div class="text-muted w-100 small mb-2 placeholder col-6"></div>
+                        
+                        <!-- Buttons placeholders -->
+                        <button class="btn btn-secondary col-12 my-2  disabled placeholder col-6"></button>
+                        <button class="btn btn-secondary col-12  border disabled placeholder col-6"></button>
                         </div>
                     </div>
                 </div>
@@ -180,6 +161,45 @@
 </div>
 
 <script>
+var limit=0
+window.addEventListener('DOMContentLoaded',e=>{
+    fetchfriends();
+})
+function fetchfriends() {
+  const formData = new FormData();
+   formData.append('action','get_friend_list_to_follow')
+   formData.append('limit',limit )
+   limit +=20
+     fetch('/friends/req.php', {
+    method: 'POST',
+    body: formData
+  })
+  .then(response => response.json()) // or response.json()
+  .then(datas => {
+    console.log(datas);
+    
+    const data=datas.map(e=>{
+       const profile=JSON.parse(e.profile);
+      return  ` 
+                <div class="col-6 col-sm-4 col-lg-3 col-xl-2" id="friend-${e.id}">
+                    <div class="friend-card">
+                        <img src="/uploads/${profile.profile_pic}" class="friend-img">
+                        <div class="friend-info">
+                            <div class="fw-bold text-truncate mb-1">${profile.first_name}  ${profile.last_name}</div>
+                            <div class="text-muted small mb-2">5 mutual friends</div>
+                            <button class="btn btn-primary btn-action" onclick="sendReq(${e.id})">Add Friend</button>
+                            <button class="btn btn-light btn-action border" onclick="removeSug(${e.id})">Remove</button>
+                        </div>
+                    </div>
+                </div>
+        `
+    }).join('');
+    document.getElementById('roots').insertAdjacentHTML('afterbegin',data);
+    console.log('Success:', data);
+  })
+}
+
+
     function sendReq(id) {
         const card = document.querySelector(`#friend-${id} .btn-primary`);
         card.innerHTML = '<i class="ri-check-line"></i> Requested';
