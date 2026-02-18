@@ -106,7 +106,7 @@
         </div>
 </div>
 <div class="container" style="margin-top:50px;">
-    <div class="row">
+    <div class="d-flex flex-wrap">
         <div class="col-md-3 d-none d-md-block friends-sidebar">
             <h4 class="fw-bold mb-4">Friends</h4>
             <?php include __DIR__."/sidebar.php"; ?>
@@ -190,7 +190,7 @@ function fetchfriends() {
     const data = datas.map(e => {
       const profile = JSON.parse(e.profile);
       return ` 
-        <div class="col-6 col-sm-4 col-lg-3 col-xl-3" id="friend-${e.id}">
+        <div class="col-6 col-sm-4 col-lg-3 col-xl-3 p-1"  id="friend-${e.id}">
           <div class="friend-card">
             <img src="/uploads/${profile.profile_pic}" class="friend-img">
             <div class="friend-info">
