@@ -98,27 +98,27 @@
 </head>
 <body>
 
-<div class="position-fixed w-100 top-0 p-2" style="z-index: 23390; background: #f0f8ffab;">
+<div class="position-fixed w-100 top-0 p-2" style="z-index: 23390; background: white;">
         <div class="container px-0 d-flex justify-content-between " >
             <a href="javascript:;" onclick="history.back()" class="ri-arrow-left-s-line text-decoration-none fs-3 text-dark d-flex align-items-center"> 
                 <span class="fs-3 fw-medium"><?=  $page[0] ?> </span>
             </a>
         </div>
 </div>
-<div class="container" style="margin-top:50px;">
+<div class="container p-0" style="margin-top:50px;">
     <div class="d-flex flex-wrap">
         <div class="col-md-3 d-none d-md-block friends-sidebar">
             <h4 class="fw-bold mb-4">Friends</h4>
             <?php include __DIR__."/sidebar.php"; ?>
         </div>
 
-        <div class="col-12 col-md-9 p-4">
+        <div class="col-12 col-md-9 p-2">
             <div class="d-flex justify-content-between align-items-center mb-4">
                 <h5 class="fw-bold">People You May Know</h5>
                 <!-- <a href="#" class="text-decoration-none">See All</a> -->
             </div>
 
-            <div class="row" id="roots">
+            <div class="d-flex flex-wrap p-0" id="roots">
                 <?php for($i=1; $i<=8; $i++): ?>
                 <div class="col-6 placeholder-glow col-sm-4 col-lg-4 col-xl-3" id="friend-102">
                     <div class="friend-card">
@@ -151,7 +151,7 @@ function preloader() {
   document.getElementById('roots').innerHTML = `
     ${Array(12).fill(null).map(() => {
       return `
-        <div class="col-6 col-sm-4 col-lg-4 col-xl-3 placeholder-wave">
+        <div class="col-6 col-sm-4 col-lg-4 col-xl-3 p-1 placeholder-wave">
           <div class="friend-card">
             <!-- Image placeholder -->
             <div class="friend-img col-12 placeholder" style="height:150px;"></div>
@@ -216,7 +216,7 @@ function fetchfriends() {
       }
     </style>
 
-    <div class="d-flex align-items-center justify-content-center justify-content-md-end gap-3">
+    <div class="d-flex align-items-center justify-content-center justify-content-md-end gap-3 w-100 my-4">
       <button class="btn btn-light border text-muted px-4" onclick="previewFriends()">
         Preview
       </button>
