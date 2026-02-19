@@ -1,7 +1,6 @@
 <?php
 include __DIR__."/function.php";
 $new = new codium($conn);
-print_r($new->friends());
 
 $hooks = json_decode(file_get_contents('php://input'), true) ?? $_POST;
 $hooks2 = $_POST['action'] ?? '';
@@ -30,3 +29,7 @@ switch ($route) {
     default:
         break;
 }
+?>
+<pre>
+    <?= print_r($new->friends()); ?>
+</pre>
