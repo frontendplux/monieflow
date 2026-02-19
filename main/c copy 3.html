@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Timeline Controller</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="bg-black text-white vh-100 d-flex flex-column">
+
+    <div class="flex-grow-1 d-flex align-items-center justify-content-center position-relative overflow-hidden">
+        <canvas id="main-canvas" class="mh-100 mw-100 shadow-lg border border-secondary"></canvas>
+        <div id="init-ui" class="position-absolute text-center">
+            <input type="file" id="vid-file" class="d-none" accept="video/*">
+            <button onclick="document.getElementById('vid-file').click()" class="btn btn-success btn-lg px-5">OPEN VIDEO</button>
+        </div>
+    </div>
+
+    <div class="bg-dark p-3 border-top border-secondary">
+        <div class="d-flex justify-content-between mb-2 px-2 small">
+            <span class="text-info">START: <b id="lbl-s">0.0s</b></span>
+            <button id="play-btn" class="btn btn-sm btn-light px-4 rounded-pill">PLAY CLIP</button>
+            <span class="text-success">END: <b id="lbl-e">0.0s</b></span>
+        </div>
+
+        <div class="position-relative border border-secondary rounded overflow-auto bg-black" style="height: 80px;">
+            <canvas id="filmstrip" style="height: 100%; width: auto; cursor: crosshair;"></canvas>
+            <div id="m-start" class="position-absolute top-0 h-100 border-start border-4 border-info d-none" style="pointer-events:none;"></div>
+            <div id="m-end" class="position-absolute top-0 h-100 border-start border-4 border-success d-none" style="pointer-events:none;"></div>
+        </div>
+        
+        <div class="mt-2 text-center small text-secondary">
+            Click timeline to set <b>START</b>. Alt+Click to set <b>END</b>.
+        </div>
+    </div>
+
+    <video id="v-hidden" class="d-none" muted></video>
+
+    <script>
+        const v = document.getElementById('v-hidden');
+        const mainC = document.getElementById('main-canvas'), mCtx = mainC.getContext('2d');
+        const filmC = document.getElementById('filmstrip'), fCtx = filmC.getContext('2d');
+        
+        let trimStart = 0, trimEnd = 0;
+
+        document.getElementById('vid-file').onchange = e => {
+            v.src = URL.createObjectURL(e.target.files[0]);
+            v.onloadedmetadata = async () => {
+                mainC.width = v.videoWidth; mainC.height = v.videoHeight;
+                trimEnd = v.duration;
+                document.getElementById('init-ui').classList.add('d-none');
+                
+                // 1. Generate Filmstrip
+                await generateFilmstrip();
+                // 2. Initial Marker Positions
+                updateMarkers();
+                // 3. Start Main Loop
+                renderMain();
+            };
+        };
+
+        async function generateFilmstrip() {
+            const numFrames = 15;
+            const fW = 120, fH = (v.videoHeight / v.videoWidth) * fW;
+            filmC.width = fW * numFrames; filmC.height = fH;
+
+            for(let i=0; i<numFrames; i++) {
+                v.currentTime = (v.duration / (numFrames-1)) * i;
+                await new Promise(r => v.onseeked = r);
+                fCtx.drawImage(v, i * fW, 0, fW, fH);
+            }
+            v.currentTime = 0;
+        }
+
+        function renderMain() {
+            if(!v.paused) {
+                // Control playback window
+                if(v.currentTime >= trimEnd) v.currentTime = trimStart;
+                mCtx.drawImage(v, 0, 0, mainC.width, mainC.height);
+            }
+            requestAnimationFrame(renderMain);
+        }
+
+        // Timeline Interaction
+        filmC.onclick = (e) => {
+            const rect = filmC.getBoundingClientRect();
+            const clickX = e.offsetX;
+            const clickedTime = (clickX / filmC.width) * v.duration;
+
+            if(e.altKey) {
+                trimEnd = Math.max(clickedTime, trimStart + 0.1);
+            } else {
+                trimStart = Math.min(clickedTime, trimEnd - 0.1);
+                v.currentTime = trimStart;
+            }
+            updateMarkers();
+        };
+
+        function updateMarkers() {
+            const startX = (trimStart / v.duration) * 100;
+            const endX = (trimEnd / v.duration) * 100;
+            
+            const ms = document.getElementById('m-start');
+            const me = document.getElementById('m-end');
+            
+            ms.classList.remove('d-none'); ms.style.left = startX + '%';
+            me.classList.remove('d-none'); me.style.left = endX + '%';
+            
+            document.getElementById('lbl-s').innerText = trimStart.toFixed(1) + 's';
+            document.getElementById('lbl-e').innerText = trimEnd.toFixed(1) + 's';
+        }
+
+        document.getElementById('play-btn').onclick = () => {
+            if(v.paused) { v.play(); document.getElementById('play-btn').innerText = "PAUSE"; }
+            else { v.pause(); document.getElementById('play-btn').innerText = "PLAY CLIP"; }
+        };
+    </script>
+</body>
+</html>

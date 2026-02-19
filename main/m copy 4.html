@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WhatsApp Real-Time Cutter</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="bg-black text-white vh-100 d-flex flex-column">
+
+    <nav class="navbar navbar-dark bg-dark px-3 border-bottom border-secondary shadow-sm">
+        <span class="navbar-brand text-success fw-bold">LIVE CUTTER</span>
+        <div id="status-text" class="small fw-bold text-uppercase text-warning">Waiting for video...</div>
+    </nav>
+
+    <div class="container-fluid flex-grow-1 p-0">
+        <div class="row g-0 h-100">
+            
+            <div class="col-md-8 position-relative bg-black d-flex align-items-center justify-content-center">
+                <canvas id="output-canvas" class="mw-100 mh-100 d-none" style="border: 2px solid #333;"></canvas>
+                
+                <div id="upload-box" class="text-center p-5">
+                    <input type="file" id="video-file" accept="video/*" class="d-none">
+                    <button onclick="document.getElementById('video-file').click()" class="btn btn-success btn-lg px-5 rounded-pill">OPEN VIDEO</button>
+                </div>
+
+                <div id="recording-indicator" class="position-absolute top-0 start-0 m-3 d-none">
+                    <span class="badge bg-danger animate-pulse">● RECORDING LIVE</span>
+                </div>
+            </div>
+
+            <div class="col-md-4 bg-dark p-4 border-start border-secondary shadow">
+                <div class="mb-5">
+                    <label class="small text-secondary fw-bold mb-3 d-block text-uppercase">1. Set Trim Area</label>
+                    <div class="position-relative mb-2" style="height: 30px; background: #222; border-radius: 5px;">
+                        <input type="range" id="start-range" class="form-range position-absolute w-100" style="z-index:10; background:none;">
+                        <input type="range" id="end-range" class="form-range position-absolute w-100" style="z-index:9; background:none;">
+                    </div>
+                    <div class="d-flex justify-content-between">
+                        <span id="label-start" class="badge bg-dark border border-secondary">0.0s</span>
+                        <span id="label-end" class="badge bg-dark border border-secondary">0.0s</span>
+                    </div>
+                </div>
+
+                <div class="mb-5">
+                    <label class="small text-secondary fw-bold mb-3 d-block text-uppercase">2. Apply Filter</label>
+                    <select id="filter-style" class="form-select bg-black text-white border-secondary">
+                        <option value="none">Original</option>
+                        <option value="grayscale(1)">Black & White</option>
+                        <option value="sepia(0.8)">Old Photo</option>
+                        <option value="contrast(1.5) brightness(1.2)">High Def</option>
+                    </select>
+                </div>
+
+                <button id="process-btn" class="btn btn-primary w-100 py-3 fw-bold d-none">RECORD & UPLOAD CLIP</button>
+                
+                <div class="progress mt-4 d-none" id="prog-cont" style="height: 8px;">
+                    <div id="prog-bar" class="progress-bar bg-success progress-bar-striped progress-bar-animated" style="width: 0%"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <video id="source-vid" class="d-none" muted></video>
+
+    <script>
+        const v = document.getElementById('source-vid'), c = document.getElementById('output-canvas'), ctx = c.getContext('2d');
+        const startR = document.getElementById('start-range'), endR = document.getElementById('end-range');
+        const status = document.getElementById('status-text');
+        let mediaRecorder, chunks = [];
+
+        // Load and setup
+        document.getElementById('video-file').onchange = e => {
+            const file = e.target.files[0];
+            v.src = URL.createObjectURL(file);
+            v.onloadedmetadata = () => {
+                c.width = v.videoWidth; c.height = v.videoHeight;
+                c.classList.remove('d-none');
+                document.getElementById('upload-box').classList.add('d-none');
+                document.getElementById('process-btn').classList.remove('d-none');
+                startR.max = endR.max = v.duration; endR.value = v.duration;
+                status.innerText = "Ready to Cut";
+                updateUI(); playPreview();
+            };
+        };
+
+        function playPreview() {
+            if (v.currentTime >= endR.value) v.currentTime = startR.value;
+            ctx.filter = document.getElementById('filter-style').value;
+            ctx.drawImage(v, 0, 0, c.width, c.height);
+            requestAnimationFrame(playPreview);
+        }
+
+        startR.oninput = () => { v.currentTime = startR.value; updateUI(); };
+        endR.oninput = () => updateUI();
+        function updateUI() {
+            document.getElementById('label-start').innerText = Number(startR.value).toFixed(1)+'s';
+            document.getElementById('label-end').innerText = Number(endR.value).toFixed(1)+'s';
+        }
+
+        // The Visible Cut & Upload Process
+        document.getElementById('process-btn').onclick = async function() {
+            const btn = this; btn.disabled = true;
+            status.innerText = "REC: WATCH PREVIEW...";
+            document.getElementById('recording-indicator').classList.remove('d-none');
+            
+            // 1. Reset video to start of trim
+            v.pause();
+            v.currentTime = startR.value;
+            await new Promise(r => v.onseeked = r);
+
+            // 2. Setup Recorder
+            const stream = c.captureStream(30); 
+            mediaRecorder = new MediaRecorder(stream, { mimeType: 'video/webm' });
+            chunks = [];
+            
+            mediaRecorder.ondataavailable = e => chunks.push(e.data);
+            mediaRecorder.onstop = performUpload;
+
+            // 3. Start Recording and Playing
+            mediaRecorder.start();
+            v.play();
+
+            // Monitor progress
+            const checker = setInterval(() => {
+                if (v.currentTime >= endR.value) {
+                    clearInterval(checker);
+                    v.pause();
+                    mediaRecorder.stop();
+                    document.getElementById('recording-indicator').classList.add('d-none');
+                }
+            }, 50);
+        };
+
+        function performUpload() {
+            status.innerText = "SENDING TO SERVER...";
+            document.getElementById('prog-cont').classList.remove('d-none');
+            
+            const blob = new Blob(chunks, { type: 'video/webm' });
+            const fd = new FormData();
+            fd.append('video', blob, 'cut_status.webm');
+
+            const xhr = new XMLHttpRequest();
+            xhr.open('POST', 'req.php', true);
+            xhr.upload.onprogress = e => {
+                document.getElementById('prog-bar').style.width = (e.loaded/e.total*100)+'%';
+            };
+            xhr.onload = () => {
+                status.innerText = "UPLOAD COMPLETE!";
+                document.getElementById('process-btn').disabled = false;
+                alert("File sent to req.php successfully!");
+            };
+            xhr.send(fd);
+        }
+    </script>
+</body>
+</html>

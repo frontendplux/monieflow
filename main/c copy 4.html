@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>10s Pro Trimmer</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        /* Custom styles to handle the dragging look without external CSS files */
+        .handle {
+            width: 12px;
+            height: 100%;
+            cursor: ew-resize;
+            background: #0d6efd;
+            position: absolute;
+            z-index: 100;
+        }
+        .handle-end { background: #198754; }
+        .trim-overlay {
+            background: rgba(13, 110, 253, 0.2);
+            position: absolute;
+            height: 100%;
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body class="bg-black text-white vh-100 d-flex flex-column">
+
+    <div class="flex-grow-1 d-flex align-items-center justify-content-center bg-dark position-relative">
+        <canvas id="main-canvas" class="mh-100 mw-100"></canvas>
+        <div id="upload-ui" class="position-absolute">
+            <input type="file" id="file-input" class="d-none" accept="video/*">
+            <button onclick="document.getElementById('file-input').click()" class="btn btn-success rounded-pill px-5">UPLOAD VIDEO</button>
+        </div>
+    </div>
+
+    <div class="bg-dark p-4 border-top border-secondary">
+        <div class="d-flex justify-content-between mb-2 small fw-bold uppercase">
+            <span>Range: <span id="dur-val" class="text-warning">0.0s</span> / 10s max</span>
+            <button id="play-btn" class="btn btn-sm btn-light px-3">PLAY CLIP</button>
+        </div>
+
+        <div id="timeline-container" class="position-relative bg-black rounded border border-secondary" style="height: 80px; user-select: none;">
+            <canvas id="filmstrip-canvas" class="w-100 h-100"></canvas>
+            
+            <div id="h-start" class="handle"></div>
+            <div id="h-end" class="handle handle-end"></div>
+            
+            <div id="selection-highlight" class="trim-overlay"></div>
+        </div>
+    </div>
+
+    <video id="v-hidden" class="d-none" muted></video>
+
+    <script>
+        const v = document.getElementById('v-hidden');
+        const mainC = document.getElementById('main-canvas'), mCtx = mainC.getContext('2d');
+        const filmC = document.getElementById('filmstrip-canvas'), fCtx = filmC.getContext('2d');
+        const container = document.getElementById('timeline-container');
+        
+        let trimS = 0, trimE = 10;
+        let isDraggingS = false, isDraggingE = false;
+        const MAX_DUR = 10; // Max allowed duration in seconds
+
+        document.getElementById('file-input').onchange = e => {
+            v.src = URL.createObjectURL(e.target.files[0]);
+            v.onloadedmetadata = async () => {
+                mainC.width = v.videoWidth; mainC.height = v.videoHeight;
+                trimS = 0;
+                trimE = Math.min(v.duration, MAX_DUR);
+                document.getElementById('upload-ui').classList.add('d-none');
+                
+                await genFilmstrip();
+                updateUI();
+                render();
+            };
+        };
+
+        async function genFilmstrip() {
+            const frames = 12;
+            filmC.width = container.offsetWidth; filmC.height = container.offsetHeight;
+            const fw = filmC.width / frames;
+            for(let i=0; i<frames; i++) {
+                v.currentTime = (v.duration / (frames-1)) * i;
+                await new Promise(r => v.onseeked = r);
+                fCtx.drawImage(v, i * fw, 0, fw, filmC.height);
+            }
+            v.currentTime = 0;
+        }
+
+        function render() {
+            if(!v.paused) {
+                if(v.currentTime >= trimE || v.currentTime < trimS) v.currentTime = trimS;
+                mCtx.drawImage(v, 0, 0, mainC.width, mainC.height);
+            }
+            requestAnimationFrame(render);
+        }
+
+        // Draggable Logic
+        const hS = document.getElementById('h-start'), hE = document.getElementById('h-end'), highlight = document.getElementById('selection-highlight');
+
+        hS.onmousedown = () => isDraggingS = true;
+        hE.onmousedown = () => isDraggingE = true;
+        window.onmouseup = () => { isDraggingS = false; isDraggingE = false; };
+
+        window.onmousemove = e => {
+            if (!isDraggingS && !isDraggingE) return;
+            
+            const rect = container.getBoundingClientRect();
+            let posX = (e.clientX - rect.left) / rect.width;
+            posX = Math.max(0, Math.min(1, posX));
+            const targetTime = posX * v.duration;
+
+            if (isDraggingS) {
+                // Ensure Start doesn't cross End and doesn't exceed 10s gap
+                trimS = Math.min(targetTime, trimE - 0.1);
+                if (trimE - trimS > MAX_DUR) trimE = trimS + MAX_DUR;
+            } else if (isDraggingE) {
+                // Ensure End doesn't cross Start and doesn't exceed 10s gap
+                trimE = Math.max(targetTime, trimS + 0.1);
+                if (trimE - trimS > MAX_DUR) trimS = trimE - MAX_DUR;
+            }
+
+            updateUI();
+        };
+
+        function updateUI() {
+            const sPct = (trimS / v.duration) * 100;
+            const ePct = (trimE / v.duration) * 100;
+
+            hS.style.left = sPct + "%";
+            hE.style.left = ePct + "%";
+            highlight.style.left = sPct + "%";
+            highlight.style.width = (ePct - sPct) + "%";
+
+            document.getElementById('dur-val').innerText = (trimE - trimS).toFixed(1) + "s";
+        }
+
+        document.getElementById('play-btn').onclick = function() {
+            if(v.paused) { v.play(); this.innerText = "PAUSE"; }
+            else { v.pause(); this.innerText = "PLAY CLIP"; }
+        };
+    </script>
+</body>
+</html>

@@ -1,0 +1,53 @@
+<div class="container mt-4">
+    <div class="border border-dark bg-black rounded shadow-sm overflow-auto mb-3" style="white-space: nowrap;">
+        <canvas id="horizontalStrip" style="height: 50px; width: 100%;"></canvas>
+    </div>
+
+    <div class="text-center">
+        <input type="file" id="videoSrc" class="d-none" accept="video/*">
+        <button onclick="document.getElementById('videoSrc').click()" class="btn btn-success px-4">Generate Horizontal Strip</button>
+    </div>
+</div>
+
+<video id="v-processor" class="d-none" muted></video>
+
+<script>
+    const v = document.getElementById('v-processor');
+    const c = document.getElementById('horizontalStrip');
+    const ctx = c.getContext('2d');
+
+    document.getElementById('videoSrc').onchange = function(e) {
+        const file = e.target.files[0];
+        if(!file) return;
+        v.src = URL.createObjectURL(file);
+
+        v.onloadedmetadata = async () => {
+            const numFrames = 10; // Number of thumbnails
+            const fWidth = v.videoWidth;
+            const fHeight = v.videoHeight;
+
+            // Set canvas size for horizontal layout
+            c.width = fWidth * numFrames;
+            c.height = fHeight;
+
+            ctx.clearRect(0, 0, c.width, c.height);
+
+            for (let i = 0; i < numFrames; i++) {
+                // Calculate timestamp
+                const time = (v.duration / (numFrames - 1)) * i;
+                v.currentTime = time;
+
+                // Wait for video to seek
+                await new Promise(r => v.onseeked = r);
+
+                // Draw at horizontal offset (X = fWidth * i)
+                ctx.drawImage(v, fWidth * i, 0, fWidth, fHeight);
+                
+                // Optional: Thin white line between frames
+                ctx.strokeStyle = "rgba(255,255,255,0.5)";
+                ctx.lineWidth = 5;
+                ctx.strokeRect(fWidth * i, 0, fWidth, fHeight);
+            }
+        };
+    };
+</script>

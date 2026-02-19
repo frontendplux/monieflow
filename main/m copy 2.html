@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WhatsApp Status Editor</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="bg-black text-white vh-100 overflow-hidden d-flex flex-column">
+
+    <nav class="navbar navbar-dark bg-dark border-bottom border-secondary px-3 shadow">
+        <span class="navbar-brand fw-bold text-success">WhatsApp Edit</span>
+        <div class="d-flex gap-2">
+            <button onclick="location.reload()" class="btn btn-outline-secondary btn-sm">Reset</button>
+            <button id="export-btn" class="btn btn-success btn-sm px-4 fw-bold">Done</button>
+        </div>
+    </nav>
+
+    <div class="container-fluid flex-grow-1 overflow-hidden">
+        <div class="row h-100">
+            
+            <div class="col-md-8 d-flex flex-column align-items-center justify-content-center bg-dark position-relative p-0 border-end border-secondary">
+                
+                <canvas id="video-canvas" class="d-none shadow-lg" style="max-width: 100%; max-height: 75vh; object-fit: contain;"></canvas>
+                
+                <div id="upload-ui" class="text-center p-5">
+                    <div class="display-1 mb-4">🎥</div>
+                    <p class="lead">Select a video to start editing</p>
+                    <input type="file" id="video-input" accept="video/*" class="d-none">
+                    <button onclick="document.getElementById('video-input').click()" class="btn btn-success btn-lg px-5 rounded-pill">Upload Video</button>
+                </div>
+
+                <div id="video-controls" class="position-absolute bottom-0 w-100 p-4 bg-dark bg-opacity-75 d-none">
+                    <div class="d-flex justify-content-between mb-2 small fw-bold">
+                        <span id="start-label" class="badge bg-secondary">0:00</span>
+                        <span id="end-label" class="badge bg-success">0:00</span>
+                    </div>
+
+                    <div class="position-relative w-100 mb-4" style="height: 30px;">
+                        <div class="position-absolute top-50 start-0 w-100 bg-secondary rounded" style="height: 6px; transform: translateY(-50%);"></div>
+                        <input type="range" id="trim-start" class="form-range position-absolute top-0 start-0 w-100 h-100" style="z-index: 5; pointer-events: auto; background: transparent;" value="0">
+                        <input type="range" id="trim-end" class="form-range position-absolute top-0 start-0 w-100 h-100" style="z-index: 4; pointer-events: auto; background: transparent;" value="100">
+                    </div>
+
+                    <div class="text-center">
+                        <button id="play-pause" class="btn btn-light rounded-circle shadow-lg" style="width: 50px; height: 50px;">▶</button>
+                    </div>
+                </div>
+            </div>
+
+            <div id="sidebar" class="col-md-4 bg-dark p-4 overflow-auto border-start border-secondary">
+                <h6 class="text-uppercase text-secondary mb-3 small fw-bold">Filter Effects</h6>
+                <div class="row g-2 mb-4">
+                    <div class="col-6"><button onclick="setFilter('none')" class="btn btn-sm btn-outline-light w-100">Original</button></div>
+                    <div class="col-6"><button onclick="setFilter('grayscale(100%)')" class="btn btn-sm btn-outline-light w-100">B&W</button></div>
+                    <div class="col-6"><button onclick="setFilter('sepia(0.8)')" class="btn btn-sm btn-outline-light w-100">Vintage</button></div>
+                    <div class="col-6"><button onclick="setFilter('brightness(1.5)')" class="btn btn-sm btn-outline-light w-100">Bright</button></div>
+                    <div class="col-6"><button onclick="setFilter('invert(1)')" class="btn btn-sm btn-outline-light w-100">X-Ray</button></div>
+                    <div class="col-6"><button onclick="setFilter('contrast(2)')" class="btn btn-sm btn-outline-light w-100">Vivid</button></div>
+                </div>
+
+                <h6 class="text-uppercase text-secondary mb-3 small fw-bold">Speed</h6>
+                <div class="btn-group w-100 mb-4">
+                    <button onclick="setSpeed(0.5)" class="btn btn-sm btn-outline-success">0.5x</button>
+                    <button onclick="setSpeed(1)" class="btn btn-sm btn-outline-success active">1x</button>
+                    <button onclick="setSpeed(1.5)" class="btn btn-sm btn-outline-success">1.5x</button>
+                    <button onclick="setSpeed(2)" class="btn btn-sm btn-outline-success">2x</button>
+                </div>
+
+                <h6 class="text-uppercase text-secondary mb-2 small fw-bold">Status Caption</h6>
+                <textarea id="caption" class="form-control bg-black border-secondary text-white mb-3" rows="3" placeholder="Add a caption..."></textarea>
+            </div>
+        </div>
+    </div>
+
+    <video id="source-video" class="d-none" loop></video>
+
+    <script>
+        const video = document.getElementById('source-video');
+        const canvas = document.getElementById('video-canvas');
+        const ctx = canvas.getContext('2d');
+        const trimStart = document.getElementById('trim-start');
+        const trimEnd = document.getElementById('trim-end');
+        let currentFilter = 'none';
+
+        // 1. Handle File Upload
+        document.getElementById('video-input').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            
+            video.src = URL.createObjectURL(file);
+            video.onloadedmetadata = () => {
+                // Setup Canvas size
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+                canvas.classList.remove('d-none');
+                document.getElementById('upload-ui').classList.add('d-none');
+                document.getElementById('video-controls').classList.remove('d-none');
+                
+                // Setup Trimmer
+                trimStart.max = video.duration;
+                trimEnd.max = video.duration;
+                trimEnd.value = video.duration;
+                updateLabels();
+                render();
+            };
+        });
+
+        // 2. Loop rendering video to canvas
+        function render() {
+            if (!video.paused && !video.ended) {
+                // Loop behavior (WhatsApp Trimming)
+                if (video.currentTime >= trimEnd.value) {
+                    video.currentTime = trimStart.value;
+                }
+                
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                ctx.filter = currentFilter; // Apply selected filter
+                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                
+                // Add Overlay Text if any
+                const text = document.getElementById('caption').value;
+                if(text) {
+                    ctx.filter = 'none'; // text shouldn't be filtered
+                    ctx.fillStyle = "white";
+                    ctx.font = "40px sans-serif";
+                    ctx.textAlign = "center";
+                    ctx.fillText(text, canvas.width/2, canvas.height - 100);
+                }
+            }
+            requestAnimationFrame(render);
+        }
+
+        // 3. Control Functions
+        function setFilter(f) { currentFilter = f; }
+        
+        function setSpeed(s) { 
+            video.playbackRate = s; 
+            document.querySelectorAll('.btn-group .btn').forEach(b => b.classList.remove('active'));
+            event.target.classList.add('active');
+        }
+
+        function updateLabels() {
+            document.getElementById('start-label').innerText = Number(trimStart.value).toFixed(1) + "s";
+            document.getElementById('end-label').innerText = Number(trimEnd.value).toFixed(1) + "s";
+        }
+
+        // 4. Input Syncing
+        trimStart.addEventListener('input', () => {
+            if (parseFloat(trimStart.value) >= parseFloat(trimEnd.value)) trimStart.value = trimEnd.value - 0.5;
+            video.currentTime = trimStart.value;
+            updateLabels();
+        });
+
+        trimEnd.addEventListener('input', () => {
+            if (parseFloat(trimEnd.value) <= parseFloat(trimStart.value)) trimEnd.value = parseFloat(trimStart.value) + 0.5;
+            updateLabels();
+        });
+
+        document.getElementById('play-pause').addEventListener('click', function() {
+            if (video.paused) {
+                video.play();
+                this.innerText = "⏸";
+            } else {
+                video.pause();
+                this.innerText = "▶";
+            }
+        });
+
+        document.getElementById('export-btn').addEventListener('click', () => {
+            alert(`Ready to Export! \nFilter: ${currentFilter}\nTrim: ${trimStart.value}s - ${trimEnd.value}s`);
+        });
+    </script>
+</body>
+</html>

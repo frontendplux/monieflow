@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WhatsApp Status Complete</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="bg-light">
+
+    <div class="container mt-4">
+        <h6 class="text-secondary fw-bold mb-3">Status</h6>
+        <div class="d-flex gap-3 overflow-auto pb-2" id="status-circles" style="scrollbar-width: none;">
+            </div>
+    </div>
+
+    <div id="status-preview" class="position-fixed top-0 start-0 w-100 h-100 bg-black d-none flex-column" style="z-index: 1050;">
+        
+        <div id="segments-container" class="position-absolute top-0 w-100 p-2 d-flex gap-1" style="z-index: 30;"></div>
+
+        <div class="position-absolute top-0 start-0 w-100 p-3 mt-3 d-flex align-items-center text-white" style="z-index: 30;">
+            <img id="preview-avatar" src="" class="rounded-circle border border-white me-2" width="40" height="40">
+            <div class="flex-grow-1">
+                <div id="preview-name" class="fw-bold small"></div>
+                <div class="text-white-50" style="font-size: 10px;">Just now</div>
+            </div>
+            <button onclick="closePreview()" class="btn-close btn-close-white shadow-none"></button>
+        </div>
+
+        <div class="position-absolute w-100 h-100 d-flex" style="z-index: 20;">
+            <div id="tap-left" class="h-100 w-25"></div>
+            <div id="tap-center" class="h-100 w-50"></div> 
+            <div id="tap-right" class="h-100 w-25"></div>
+        </div>
+
+        <div class="w-100 h-100 d-flex align-items-center justify-content-center">
+            <img id="preview-media" src="" class="img-fluid w-100 h-100 object-fit-contain">
+        </div>
+    </div>
+
+    <script>
+    const userData = [
+        {
+            id: 0, name: "John Doe", avatar: "https://i.pravatar.cc/150?u=1",
+            posts: ["https://picsum.photos/id/10/800/1200", "https://picsum.photos/id/11/800/1200", "https://picsum.photos/id/12/800/1200"]
+        },
+        {
+            id: 1, name: "Sarah Smith", avatar: "https://i.pravatar.cc/150?u=2",
+            posts: ["https://picsum.photos/id/20/800/1200", "https://picsum.photos/id/21/800/1200", "https://picsum.photos/id/22/800/1200"]
+        },
+        {
+            id: 1, name: "Sarah Smith", avatar: "https://i.pravatar.cc/150?u=2",
+            posts: ["https://picsum.photos/id/20/800/1200"]
+        }
+    ];
+
+    let currentUserIdx = 0;
+    let currentSlideIdx = 0;
+    let progress = 0;
+    let timer;
+    let isPaused = false;
+
+    // Initialize Status Circles
+    // const circlesCont = document.getElementById('status-circles');
+    // userData.forEach((user, idx) => {
+    //     const div = document.createElement('div');
+    //     div.className = "text-center";
+    //     div.style.minWidth = "75px";
+    //     div.innerHTML = `
+    //         <div class="p-1 rounded-circle border border-2 border-success d-inline-block shadow-sm" onclick="openPreview(${idx})" style="cursor:pointer">
+    //             <img src="${user.avatar}" class="rounded-circle" width="55" height="55">
+    //         </div>
+    //         <div class="small mt-1 text-truncate">${user.name.split(' ')[0]}</div>
+    //     `;
+    //     circlesCont.appendChild(div);
+    // });
+
+    // Initialize Status Circles with Segmented Borders
+const circlesCont = document.getElementById('status-circles');
+
+userData.forEach((user, idx) => {
+    const numPosts = user.posts.length;
+    const div = document.createElement('div');
+    div.className = "text-center";
+    div.style.minWidth = "75px";
+
+    // WhatsApp logic: if 1 post, solid border. If > 1, segmented.
+    // We use a conic-gradient to create the gaps.
+    let borderStyle = "";
+    if (numPosts > 1) {
+        const gap = 4; // size of the gap in degrees
+        const segmentSize = (360 / numPosts) - gap;
+        let gradientParts = [];
+        
+        for (let i = 0; i < numPosts; i++) {
+            const start = i * (360 / numPosts);
+            const end = start + segmentSize;
+            gradientParts.push(`#198754 ${start}deg ${end}deg`); // Bootstrap Success Color
+            gradientParts.push(`transparent ${end}deg ${start + (360 / numPosts)}deg`);
+        }
+        borderStyle = `background: conic-gradient(${gradientParts.join(', ')});`;
+    } else {
+        borderStyle = `border: 2px solid #198754;`;
+    }
+
+    div.innerHTML = `
+        <div class="d-inline-block p-1 rounded-circle shadow-sm" 
+             onclick="openPreview(${idx})" 
+             style="cursor:pointer; width:68px; height:68px; ${borderStyle}">
+            <div class="bg-light rounded-circle p-1 w-100 h-100">
+                <img src="${user.avatar}" class="rounded-circle w-100 h-100 object-fit-cover">
+            </div>
+        </div>
+        <div class="small mt-1 text-truncate">${user.name.split(' ')[0]}</div>
+    `;
+    circlesCont.appendChild(div);
+});
+
+    const segmentsCont = document.getElementById('segments-container');
+    const previewMedia = document.getElementById('preview-media');
+
+    function initSegments() {
+        segmentsCont.innerHTML = '';
+        userData[currentUserIdx].posts.forEach((_, i) => {
+            const seg = document.createElement('div');
+            seg.className = "progress flex-grow-1 bg-secondary bg-opacity-50";
+            seg.style.height = "2px";
+            seg.innerHTML = `<div id="bar-${i}" class="progress-bar bg-white w-0 transition-none"></div>`;
+            segmentsCont.appendChild(seg);
+        });
+    }
+
+    function loadContent() {
+        const user = userData[currentUserIdx];
+        previewMedia.src = user.posts[currentSlideIdx];
+        document.getElementById('preview-avatar').src = user.avatar;
+        document.getElementById('preview-name').innerText = user.name;
+
+        // Sync bars
+        for(let i=0; i < user.posts.length; i++) {
+            const bar = document.getElementById(`bar-${i}`);
+            if(i < currentSlideIdx) bar.style.width = '100%';
+            else if(i > currentSlideIdx) bar.style.width = '0%';
+        }
+        startTimer();
+    }
+
+    function startTimer() {
+        progress = 0;
+        clearInterval(timer);
+        const activeBar = document.getElementById(`bar-${currentSlideIdx}`);
+        timer = setInterval(() => {
+            if (!isPaused) {
+                progress += 1;
+                activeBar.style.width = progress + '%';
+                if (progress >= 100) nextSlide();
+            }
+        }, 40); // 4 Seconds per status
+    }
+
+    function nextSlide() {
+        if (currentSlideIdx < userData[currentUserIdx].posts.length - 1) {
+            currentSlideIdx++;
+            loadContent();
+        } else if (currentUserIdx < userData.length - 1) {
+            currentUserIdx++;
+            currentSlideIdx = 0;
+            initSegments();
+            loadContent();
+        } else {
+            closePreview();
+        }
+    }
+
+    function prevSlide() {
+        if (currentSlideIdx > 0) {
+            currentSlideIdx--;
+            loadContent();
+        } else if (currentUserIdx > 0) {
+            currentUserIdx--;
+            currentSlideIdx = userData[currentUserIdx].posts.length - 1;
+            initSegments();
+            loadContent();
+        } else {
+            currentSlideIdx = 0;
+            loadContent();
+        }
+    }
+
+    // Hold-to-Pause Logic
+    const tapCenter = document.getElementById('tap-center');
+    const pauseStart = () => { isPaused = true; };
+    const pauseEnd = () => { isPaused = false; };
+
+    tapCenter.addEventListener('mousedown', pauseStart);
+    tapCenter.addEventListener('mouseup', pauseEnd);
+    tapCenter.addEventListener('touchstart', pauseStart);
+    tapCenter.addEventListener('touchend', pauseEnd);
+
+    document.getElementById('tap-right').onclick = nextSlide;
+    document.getElementById('tap-left').onclick = prevSlide;
+
+    function openPreview(uId) {
+        currentUserIdx = uId;
+        currentSlideIdx = 0;
+        document.getElementById('status-preview').classList.replace('d-none', 'd-flex');
+        initSegments();
+        loadContent();
+    }
+
+    function closePreview() {
+        clearInterval(timer);
+        document.getElementById('status-preview').classList.replace('d-flex', 'd-none');
+    }
+    </script>
+</body>
+</html>

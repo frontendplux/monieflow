@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WhatsApp Status Editor Pro</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="bg-black text-white vh-100 overflow-hidden d-flex flex-column">
+
+    <nav class="navbar navbar-dark bg-dark px-3 border-bottom border-secondary shadow">
+        <button onclick="location.reload()" class="btn btn-close btn-close-white sm"></button>
+        <div class="d-flex align-items-center gap-3">
+            <div id="upload-status" class="small text-success fw-bold"></div>
+            <button id="send-btn" class="btn btn-success rounded-pill px-4 fw-bold d-none">SEND</button>
+        </div>
+    </nav>
+
+    <div class="container-fluid flex-grow-1 p-0 d-flex flex-column">
+        <div class="row g-0 h-100">
+            
+            <div class="col-12 col-md-8 position-relative bg-black d-flex align-items-center justify-content-center border-end border-secondary">
+                <canvas id="main-canvas" class="mw-100 mh-100 d-none shadow"></canvas>
+                
+                <div id="drop-zone" class="text-center p-5 border border-secondary border-dashed rounded m-4">
+                    <h2 class="display-6 mb-4">Select Video</h2>
+                    <input type="file" id="video-input" accept="video/*" class="d-none">
+                    <button onclick="document.getElementById('video-input').click()" class="btn btn-success btn-lg px-5">UPLOAD</button>
+                </div>
+
+                <button id="play-btn" class="btn btn-light rounded-circle position-absolute top-50 start-50 translate-middle opacity-50 d-none" style="width: 70px; height: 70px; z-index: 10;">▶</button>
+            </div>
+
+            <div class="col-12 col-md-4 bg-dark p-4 overflow-auto border-top border-md-none border-secondary">
+                <h6 class="text-secondary small fw-bold mb-3 uppercase">TRIM VIDEO</h6>
+                
+                <div class="position-relative bg-black rounded overflow-hidden mb-4" style="height: 60px;" id="frame-strip">
+                    <div id="thumbnail-container" class="d-flex h-100 opacity-50"></div>
+                    <input type="range" id="trim-start" class="form-range position-absolute top-0 w-100 h-100" style="z-index: 5; background: transparent;" value="0">
+                    <input type="range" id="trim-end" class="form-range position-absolute top-0 w-100 h-100" style="z-index: 4; background: transparent;" value="100">
+                </div>
+
+                <div class="d-flex justify-content-between mb-4 small">
+                    <span>Start: <b id="start-time">0:00</b></span>
+                    <span>End: <b id="end-time">0:00</b></span>
+                </div>
+
+                <label class="small text-secondary fw-bold mb-2">FILTER</label>
+                <select id="filter-mod" class="form-select bg-black text-white border-secondary mb-4">
+                    <option value="none">Original</option>
+                    <option value="grayscale(1)">Black & White</option>
+                    <option value="sepia(0.7)">Vintage</option>
+                    <option value="brightness(1.3) contrast(1.2)">Vivid</option>
+                </select>
+
+                <label class="small text-secondary fw-bold mb-2">CAPTION</label>
+                <textarea id="caption" class="form-control bg-black text-white border-secondary mb-4" placeholder="Add a caption..."></textarea>
+
+                <div class="progress d-none mb-3" id="progress-container" style="height: 10px;">
+                    <div id="upload-bar" class="progress-bar bg-success progress-bar-striped progress-bar-animated" style="width: 0%"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <video id="hidden-video" class="d-none" loop muted></video>
+
+    <script>
+        const video = document.getElementById('hidden-video');
+        const canvas = document.getElementById('main-canvas');
+        const ctx = canvas.getContext('2d');
+        const trimStart = document.getElementById('trim-start');
+        const trimEnd = document.getElementById('trim-end');
+        let rawFile = null;
+
+        // 1. Setup Video & Thumbnail Strip
+        document.getElementById('video-input').addEventListener('change', function(e) {
+            rawFile = e.target.files[0];
+            video.src = URL.createObjectURL(rawFile);
+            
+            video.onloadedmetadata = () => {
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+                canvas.classList.remove('d-none');
+                document.getElementById('drop-zone').classList.add('d-none');
+                document.getElementById('play-btn').classList.remove('d-none');
+                document.getElementById('send-btn').classList.remove('d-none');
+                
+                trimStart.max = video.duration;
+                trimEnd.max = video.duration;
+                trimEnd.value = video.duration;
+                
+                generateThumbnails();
+                updateLabels();
+                render();
+            };
+        });
+
+        // 2. Generate Thumbnails (The "WhatsApp" look)
+        async function generateThumbnails() {
+            const container = document.getElementById('thumbnail-container');
+            container.innerHTML = '';
+            const tempVideo = document.createElement('video');
+            tempVideo.src = video.src;
+            
+            for(let i = 0; i < 8; i++) {
+                const thumb = document.createElement('canvas');
+                thumb.className = "h-100 flex-grow-1 border-end border-dark";
+                container.appendChild(thumb);
+                
+                tempVideo.currentTime = (video.duration / 8) * i;
+                tempVideo.onseeked = () => {
+                    thumb.getContext('2d').drawImage(tempVideo, 0, 0, thumb.width, thumb.height);
+                };
+            }
+        }
+
+        // 3. Render Canvas
+        function render() {
+            if (!video.paused) {
+                if (video.currentTime >= trimEnd.value) video.currentTime = trimStart.value;
+                ctx.filter = document.getElementById('filter-mod').value;
+                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            }
+            requestAnimationFrame(render);
+        }
+
+        // 4. Trimmer Logic
+        trimStart.oninput = () => {
+            if(parseFloat(trimStart.value) >= parseFloat(trimEnd.value)) trimStart.value = trimEnd.value - 0.1;
+            video.currentTime = trimStart.value;
+            updateLabels();
+        };
+        trimEnd.oninput = () => {
+            if(parseFloat(trimEnd.value) <= parseFloat(trimStart.value)) trimEnd.value = parseFloat(trimStart.value) + 0.1;
+            updateLabels();
+        };
+
+        function updateLabels() {
+            document.getElementById('start-time').innerText = Number(trimStart.value).toFixed(1) + "s";
+            document.getElementById('end-time').innerText = Number(trimEnd.value).toFixed(1) + "s";
+        }
+
+        // 5. AJAX Upload to req.php
+        document.getElementById('send-btn').onclick = function() {
+            const btn = this;
+            const progContainer = document.getElementById('progress-container');
+            const bar = document.getElementById('upload-bar');
+            
+            btn.disabled = true;
+            progContainer.classList.remove('d-none');
+
+            const fd = new FormData();
+            fd.append('video', rawFile);
+            fd.append('start', trimStart.value);
+            fd.append('end', trimEnd.value);
+            fd.append('caption', document.getElementById('caption').value);
+
+            const xhr = new XMLHttpRequest();
+            xhr.open('POST', 'req.php', true);
+
+            xhr.upload.onprogress = (e) => {
+                if (e.lengthComputable) {
+                    const pct = (e.loaded / e.total) * 100;
+                    bar.style.width = pct + '%';
+                }
+            };
+
+            xhr.onload = function() {
+                document.getElementById('upload-status').innerText = "UPLOADED SUCCESSFULLY";
+                btn.innerText = "DONE";
+            };
+
+            xhr.send(fd);
+        };
+
+        document.getElementById('play-btn').onclick = function() {
+            if(video.paused) { video.play(); this.classList.add('opacity-0'); }
+            else { video.pause(); this.classList.remove('opacity-0'); }
+        };
+    </script>
+</body>
+</html>

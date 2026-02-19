@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WhatsApp Pro Status Cutter</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        :root { --whatsapp-green: #198754; --whatsapp-blue: #0d6efd; }
+        body { background: #0b0b0b; height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
+        
+        /* Main Viewport */
+        #preview-container { flex-grow: 1; display: flex; align-items: center; justify-content: center; position: relative; background: #000; }
+        #main-canvas { max-height: 100%; max-width: 100%; box-shadow: 0 0 20px rgba(0,0,0,0.5); }
+
+        /* Timeline Styling */
+        #timeline-wrapper { background: #1a1a1a; padding: 20px; border-top: 1px solid #333; position: relative; }
+        #timeline-container { height: 80px; position: relative; background: #000; border-radius: 8px; border: 1px solid #444; margin-top: 40px; cursor: pointer; }
+        
+        .handle { width: 18px; height: 100%; cursor: col-resize; position: absolute; z-index: 100; border: 2px solid white; border-radius: 4px; box-shadow: 0 0 10px rgba(0,0,0,0.8); }
+        #h-start { background: var(--whatsapp-blue); }
+        #h-end { background: var(--whatsapp-green); }
+        
+        .trim-selection { 
+            background: rgba(25, 135, 84, 0.25); 
+            position: absolute; height: 100%; 
+            border-top: 3px solid var(--whatsapp-green); border-bottom: 3px solid var(--whatsapp-green);
+            cursor: grab; z-index: 50;
+        }
+        .trim-selection:active { cursor: grabbing; }
+
+        /* Floating Tooltip */
+        #time-tooltip {
+            position: absolute; top: -45px; transform: translateX(-50%);
+            background: var(--whatsapp-green); color: white; padding: 4px 10px;
+            border-radius: 6px; font-size: 13px; font-weight: bold;
+            pointer-events: none; display: none; z-index: 200; white-space: nowrap;
+        }
+        #time-tooltip::after {
+            content: ''; position: absolute; bottom: -6px; left: 50%;
+            margin-left: -6px; border-width: 6px; border-style: solid;
+            border-color: var(--whatsapp-green) transparent transparent transparent;
+        }
+
+        .badge-timer { font-family: monospace; font-size: 1.1rem; }
+    </style>
+</head>
+<body>
+
+    <div class="d-flex justify-content-between align-items-center px-3 py-2 bg-dark border-bottom border-secondary">
+        <div class="text-success fw-bold">STATUS EDITOR</div>
+        <div class="d-flex gap-3">
+            <span class="text-info small">START: <span id="lbl-start" class="badge-timer">0:00.0</span></span>
+            <span class="text-success small">END: <span id="lbl-end" class="badge-timer">0:10.0</span></span>
+        </div>
+    </div>
+
+    <div id="preview-container">
+        <canvas id="main-canvas"></canvas>
+        <div id="upload-overlay" class="text-center">
+            <input type="file" id="file-input" class="d-none" accept="video/*">
+            <button onclick="document.getElementById('file-input').click()" class="btn btn-success rounded-pill px-5 btn-lg fw-bold shadow">OPEN VIDEO</button>
+        </div>
+    </div>
+
+    <div id="timeline-wrapper">
+        <div id="timeline-container">
+            <div id="time-tooltip">0:00.0</div>
+            <canvas id="filmstrip-canvas" class="w-100 h-100 opacity-50"></canvas>
+            <div id="selection-bg" class="trim-selection"></div>
+            <div id="h-start" class="handle"></div>
+            <div id="h-end" class="handle"></div>
+        </div>
+
+        <div class="d-flex gap-3 mt-4">
+            <button id="play-btn" class="btn btn-outline-light flex-grow-1 py-2 fw-bold">PLAY PREVIEW</button>
+            <button id="upload-btn" class="btn btn-primary flex-grow-1 py-2 fw-bold d-none">UPLOAD 10s CUT</button>
+        </div>
+
+        <div id="status-msg" class="text-center mt-2 small text-warning fw-bold"></div>
+        
+        <div class="progress mt-2 d-none" id="prog-cont" style="height: 6px;">
+            <div id="prog-bar" class="progress-bar bg-success progress-bar-striped progress-bar-animated" style="width: 0%"></div>
+        </div>
+    </div>
+
+    <video id="v-hidden" class="d-none" crossorigin="anonymous"></video>
+
+    <script>
+        const v = document.getElementById('v-hidden');
+        const mainC = document.getElementById('main-canvas'), mCtx = mainC.getContext('2d');
+        const filmC = document.getElementById('filmstrip-canvas'), fCtx = filmC.getContext('2d');
+        const hS = document.getElementById('h-start'), hE = document.getElementById('h-end'), 
+              sel = document.getElementById('selection-bg'), tooltip = document.getElementById('time-tooltip'),
+              container = document.getElementById('timeline-container');
+        
+        let trimS = 0, trimE = 10, dragMode = null, lastX = 0;
+        const MAX_LIMIT = 10.0;
+
+        // 1. Load Video & Generate Filmstrip
+        document.getElementById('file-input').onchange = e => {
+            const file = e.target.files[0];
+            if(!file) return;
+            v.src = URL.createObjectURL(file);
+            v.onloadedmetadata = async () => {
+                mainC.width = v.videoWidth; mainC.height = v.videoHeight;
+                trimS = 0; trimE = Math.min(v.duration, 10);
+                document.getElementById('upload-overlay').classList.add('d-none');
+                document.getElementById('upload-btn').classList.remove('d-none');
+                await generateThumbnails();
+                updateUI();
+                startPlaybackLoop();
+            };
+        };
+
+        async function generateThumbnails() {
+            const frames = 12;
+            filmC.width = container.offsetWidth; filmC.height = container.offsetHeight;
+            const fw = filmC.width / frames;
+            for(let i=0; i<frames; i++) {
+                v.currentTime = (v.duration / (frames-1)) * i;
+                await new Promise(r => v.onseeked = r);
+                fCtx.drawImage(v, i * fw, 0, fw, filmC.height);
+            }
+            v.currentTime = 0;
+        }
+
+        function startPlaybackLoop() {
+            function step() {
+                if(!v.paused) {
+                    if(v.currentTime >= trimE || v.currentTime < trimS) v.currentTime = trimS;
+                    mCtx.drawImage(v, 0, 0, mainC.width, mainC.height);
+                }
+                requestAnimationFrame(step);
+            }
+            requestAnimationFrame(step);
+        }
+
+        // 2. Dragging Logic (Start, End, and Slide Box)
+        const updateSelection = (e) => {
+            if (!dragMode) return;
+            const rect = container.getBoundingClientRect();
+            const timePerPx = v.duration / rect.width;
+            let currentX = e.clientX - rect.left;
+            let currentTime = (currentX / rect.width) * v.duration;
+
+            if (dragMode === 'start') {
+                trimS = Math.max(0, Math.min(currentTime, trimE - 0.2));
+                if (trimE - trimS > MAX_LIMIT) trimE = trimS + MAX_LIMIT;
+                moveTooltip(trimS, e.clientX - rect.left);
+            } 
+            else if (dragMode === 'end') {
+                trimE = Math.min(v.duration, Math.max(currentTime, trimS + 0.2));
+                if (trimE - trimS > MAX_LIMIT) trimS = trimE - MAX_LIMIT;
+                moveTooltip(trimE, e.clientX - rect.left);
+            } 
+            else if (dragMode === 'slide') {
+                let deltaT = (e.clientX - lastX) * timePerPx;
+                if (trimS + deltaT >= 0 && trimE + deltaT <= v.duration) {
+                    trimS += deltaT;
+                    trimE += deltaT;
+                }
+                lastX = e.clientX;
+                moveTooltip(trimS, e.clientX - rect.left);
+            }
+            updateUI();
+        };
+
+        const moveTooltip = (time, x) => {
+            tooltip.innerText = formatTime(time);
+            tooltip.style.left = x + "px";
+        };
+
+        hS.onmousedown = (e) => { dragMode = 'start'; tooltip.style.display = 'block'; e.stopPropagation(); };
+        hE.onmousedown = (e) => { dragMode = 'end'; tooltip.style.display = 'block'; e.stopPropagation(); };
+        sel.onmousedown = (e) => { dragMode = 'slide'; lastX = e.clientX; tooltip.style.display = 'block'; };
+        
+        window.onmousemove = updateSelection;
+        window.onmouseup = () => { dragMode = null; tooltip.style.display = 'none'; };
+
+        function updateUI() {
+            const sPct = (trimS / v.duration) * 100;
+            const ePct = (trimE / v.duration) * 100;
+            hS.style.left = `calc(${sPct}% - 9px)`;
+            hE.style.left = `calc(${ePct}% - 9px)`;
+            sel.style.left = sPct + "%";
+            sel.style.width = (ePct - sPct) + "%";
+            document.getElementById('lbl-start').innerText = formatTime(trimS);
+            document.getElementById('lbl-end').innerText = formatTime(trimE);
+        }
+
+        function formatTime(sec) {
+            let m = Math.floor(sec / 60);
+            let s = Math.floor(sec % 60);
+            let ms = Math.floor((sec % 1) * 10);
+            return `${m}:${s < 10 ? '0'+s : s}.${ms}`;
+        }
+
+        // 3. Capture & Upload to req.php
+        document.getElementById('upload-btn').onclick = async function() {
+            const btn = this; btn.disabled = true;
+            document.getElementById('status-msg').innerText = "RECORDING 10s CLIP...";
+            
+            v.pause(); v.currentTime = trimS; v.muted = false;
+            await new Promise(r => v.onseeked = r);
+
+            // Capture Canvas + Audio
+            const stream = mainC.captureStream(30);
+            if (v.captureStream) {
+                const audio = v.captureStream().getAudioTracks();
+                if(audio.length) stream.addTrack(audio[0]);
+            }
+
+            const recorder = new MediaRecorder(stream, { mimeType: 'video/webm' });
+            let chunks = [];
+            recorder.ondataavailable = e => chunks.push(e.data);
+            recorder.onstop = () => uploadBlob(new Blob(chunks, { type: 'video/webm' }));
+
+            recorder.start();
+            v.play();
+
+            const timerCheck = setInterval(() => {
+                if (v.currentTime >= trimE) {
+                    clearInterval(timerCheck);
+                    v.pause();
+                    recorder.stop();
+                }
+            }, 50);
+        };
+
+        function uploadBlob(blob) {
+            document.getElementById('status-msg').innerText = "UPLOADING TO SERVER...";
+            document.getElementById('prog-cont').classList.remove('d-none');
+            
+            const fd = new FormData();
+            fd.append('video', blob, 'status_cut.webm');
+
+            const xhr = new XMLHttpRequest();
+            xhr.open('POST', 'req.php', true);
+            xhr.upload.onprogress = e => {
+                document.getElementById('prog-bar').style.width = (e.loaded/e.total*100) + '%';
+            };
+            xhr.onload = () => {
+                alert("SUCCESS: Video uploaded to req.php");
+                location.reload();
+            };
+            xhr.send(fd);
+        }
+
+        document.getElementById('play-btn').onclick = function() {
+            if(v.paused) { v.play(); this.innerText = "PAUSE PREVIEW"; }
+            else { v.pause(); this.innerText = "PLAY PREVIEW"; }
+        };
+    </script>
+</body>
+</html>

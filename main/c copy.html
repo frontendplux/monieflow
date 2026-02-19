@@ -1,0 +1,54 @@
+<div class="container mt-4 text-center">
+    <div class="row">
+        <div class="col-md-4 mx-auto">
+            <canvas id="filmstrip" class="border border-dark shadow-sm bg-black w-100" style="height: 500px; object-fit: contain;"></canvas>
+            
+            <div class="mt-3">
+                <input type="file" id="vid-file" class="d-none" accept="video/*">
+                <button onclick="document.getElementById('vid-file').click()" class="btn btn-dark w-100">Generate Vertical Strip</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<video id="temp-v" class="d-none" muted></video>
+
+<script>
+    const v = document.getElementById('temp-v');
+    const c = document.getElementById('filmstrip');
+    const ctx = c.getContext('2d');
+
+    document.getElementById('vid-file').onchange = function(e) {
+        const file = e.target.files[0];
+        v.src = URL.createObjectURL(file);
+
+        v.onloadedmetadata = async () => {
+            const numFrames = 5;
+            const frameWidth = v.videoWidth;
+            const frameHeight = v.videoHeight;
+
+            // Set canvas size for a vertical stack
+            c.width = frameWidth;
+            c.height = frameHeight * numFrames;
+
+            ctx.clearRect(0, 0, c.width, c.height);
+
+            for (let i = 0; i < numFrames; i++) {
+                // Calculate time: 0%, 25%, 50%, 75%, 100%
+                const time = (v.duration / (numFrames - 1)) * i;
+                v.currentTime = time;
+
+                // Wait for the video to seek to that specific frame
+                await new Promise(res => v.onseeked = res);
+
+                // Draw frame at a vertical offset (Y = frameHeight * i)
+                ctx.drawImage(v, 0, frameHeight * i, frameWidth, frameHeight);
+                
+                // Optional: Draw a white divider line between frames
+                ctx.strokeStyle = "white";
+                ctx.lineWidth = 10;
+                ctx.strokeRect(0, frameHeight * i, frameWidth, frameHeight);
+            }
+        };
+    };
+</script>

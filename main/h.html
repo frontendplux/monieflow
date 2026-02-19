@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WhatsApp Status UI</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="bg-dark d-flex align-items-center justify-content-center vh-100 overflow-hidden">
+
+    <div id="status-container" class="position-relative bg-black shadow" style="width: 100%; max-width: 450px; height: 90vh;">
+        
+        <div id="progress-wrapper" class="position-absolute top-0 start-0 w-100 d-flex p-2 gap-1" style="z-index: 10;">
+            </div>
+
+        <div class="position-absolute top-0 start-0 w-100 d-flex align-items-center p-3 mt-3 text-white" style="z-index: 10;">
+            <img src="https://via.placeholder.com/40" class="rounded-circle border border-2 border-white me-2" alt="User">
+            <div class="fw-bold">Your Name <br><small class="fw-light opacity-75">Just now</small></div>
+        </div>
+
+        <div class="w-100 h-100 d-flex align-items-center justify-content-center bg-dark">
+            <img id="status-media" src="" class="img-fluid w-100 h-100 object-fit-cover" alt="Status Content">
+        </div>
+
+        <div class="position-absolute top-0 start-0 h-100 w-100 d-flex" style="z-index: 5;">
+            <div id="prev-btn" class="w-50 h-100"></div>
+            <div id="next-btn" class="w-50 h-100"></div>
+        </div>
+
+        <div class="position-absolute bottom-0 start-0 w-100 p-3 d-flex align-items-center gap-2" style="z-index: 10;">
+            <input type="text" class="form-control rounded-pill bg-transparent border-white text-white opacity-75" placeholder="Reply...">
+        </div>
+    </div>
+
+    <script>
+        const stories = [
+    { type: 'image', url: 'https://picsum.photos/id/10/800/1200' },
+    { type: 'image', url: 'https://picsum.photos/id/20/800/1200' },
+    { type: 'image', url: 'https://picsum.photos/id/30/800/1200' }
+];
+
+let currentIndex = 0;
+let progress = 0;
+let interval;
+const duration = 5000; // 5 seconds per story
+
+const mediaEl = document.getElementById('status-media');
+const progressWrapper = document.getElementById('progress-wrapper');
+
+// 1. Initialize Progress Bars
+function initBars() {
+    progressWrapper.innerHTML = '';
+    stories.forEach((_, i) => {
+        const barBase = document.createElement('div');
+        barBase.className = "progress flex-grow-1 bg-secondary rounded-pill";
+        barBase.style.height = "3px";
+        
+        const barInner = document.createElement('div');
+        barInner.className = "progress-bar bg-white transition-none";
+        barInner.style.width = i < currentIndex ? "100%" : "0%";
+        barInner.id = `bar-${i}`;
+        
+        barBase.appendChild(barInner);
+        progressWrapper.appendChild(barBase);
+    });
+}
+
+// 2. Load Story
+function loadStory(index) {
+    if (index >= stories.length) {
+        alert("Status Finished!");
+        currentIndex = 0; // Loop back or close
+    }
+    currentIndex = index;
+    mediaEl.src = stories[currentIndex].url;
+    initBars();
+    startProgress();
+}
+
+// 3. Animate Progress
+function startProgress() {
+    clearInterval(interval);
+    progress = 0;
+    const bar = document.getElementById(`bar-${currentIndex}`);
+    
+    interval = setInterval(() => {
+        progress += (100 / (duration / 50)); // Update every 50ms
+        bar.style.width = `${progress}%`;
+
+        if (progress >= 100) {
+            nextStory();
+        }
+    }, 50);
+}
+
+function nextStory() {
+    if (currentIndex < stories.length - 1) {
+        loadStory(currentIndex + 1);
+    } else {
+        clearInterval(interval);
+    }
+}
+
+function prevStory() {
+    if (currentIndex > 0) {
+        loadStory(currentIndex - 1);
+    } else {
+        loadStory(0);
+    }
+}
+
+// Event Listeners
+document.getElementById('next-btn').addEventListener('click', nextStory);
+document.getElementById('prev-btn').addEventListener('click', prevStory);
+
+// Start
+loadStory(0);
+    </script>
+</body>
+</html>
