@@ -187,7 +187,8 @@
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 <script src="/api.js"></script>
 <script>
-const loader_board='http://'+window.location.hostname+':3000/req.php';
+// const loader_board='http://'+window.location.hostname+':3000/req.php';
+ const loader_board =window.location.protocol + '//' + window.location.host + '/req.php';
 const form = document.querySelector("form");
 const loginBtn = document.getElementById("loginBtn");
 const spinner = document.getElementById("btnSpinner");
