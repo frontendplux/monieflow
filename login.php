@@ -6,7 +6,8 @@
     <title>Login | SocialFlow</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/remixicon/fonts/remixicon.css" rel="stylesheet">
-    
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#0d6efd">
     <style>
         :root {
             --primary-gradient: linear-gradient(45deg, #6366f1, #a855f7);
@@ -241,7 +242,71 @@ form.addEventListener("submit", async function (e) {
         btnText.textContent = "Sign In";
     }
 });
-</script>
 
+
+async function registerPush() {
+
+    if (!('serviceWorker' in navigator)) return;
+    if (!('PushManager' in window)) return;
+
+    // 1️⃣ Ask permission FIRST
+    const permission = await Notification.requestPermission();
+
+    if (permission !== 'granted') {
+        console.log("Notification permission denied");
+        return;
+    }
+
+    // 2️⃣ Register service worker
+    const registration = await navigator.serviceWorker.register('/sw.js');
+
+    // 3️⃣ Subscribe user
+    const subscription = await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: 'BBYXvq1PxO2cbiObWyYyqQWVMBSM_mPQhuTQ_4b_b9h2nTezZ9NOcZglfcr4KXBFSyZQixoxbppWVDvFhIxD4C0'
+    });
+
+    // 4️⃣ Send subscription to server
+    await fetch('/save-subscription.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(subscription)
+    });
+
+    console.log("Push registered successfully");
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+    registerPush();
+});
+
+
+// <button id="enable-notif-btn">Enable Notifications</button>
+
+// <scrip>
+// document.getElementById("enable-notif-btn").addEventListener("click", async () => {
+//     await registerPush(); // your push registration function
+// });
+
+// async function registerPush() {
+
+//     if (!('serviceWorker' in navigator)) return;
+
+//     const registration = await navigator.serviceWorker.register('/sw.js');
+
+//     const subscription = await registration.pushManager.subscribe({
+//         userVisibleOnly: true,
+//         applicationServerKey: 'BBYXvq1PxO2cbiObWyYyqQWVMBSM_mPQhuTQ_4b_b9h2nTezZ9NOcZglfcr4KXBFSyZQixoxbppWVDvFhIxD4C0'
+//     });
+
+//     await fetch('/save-subscription.php', {
+//         method: 'POST',
+//         headers: { 'Content-Type': 'application/json' },
+//         body: JSON.stringify(subscription)
+//     });
+// }
+
+// registerPush();
+// </script>
 </body>
 </html>

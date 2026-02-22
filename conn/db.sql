@@ -166,3 +166,13 @@ CREATE TABLE IF NOT EXISTS friends (
     CONSTRAINT fk_friend_friend FOREIGN KEY (friend_id) REFERENCES users(id)
         ON DELETE CASCADE ON UPDATE CASCADE
 );
+
+
+CREATE TABLE if not EXISTS push_subscriptions (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    user_id BIGINT NOT NULL,
+    endpoint TEXT NOT NULL,
+    p256dh TEXT NOT NULL,
+    auth TEXT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);

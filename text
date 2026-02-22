@@ -1,3 +1,11 @@
+{
+"subject": "mailto: <frontendplux@gmail.com>",
+"publicKey": "BBYXvq1PxO2cbiObWyYyqQWVMBSM_mPQhuTQ_4b_b9h2nTezZ9NOcZglfcr4KXBFSyZQixoxbppWVDvFhIxD4C0",
+"privateKey": "kIipYEdGgUxoWg9LUL5d7rWtVg8K9ej79qppUfHsdrk"
+}
+
+
+
 npm init -y
 npm install browser-sync --save-dev
 npx browser-sync start --proxy "localhost:3000" --files "**/*.*"
