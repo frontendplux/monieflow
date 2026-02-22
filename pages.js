@@ -2,13 +2,13 @@ import createPost from "./page/create-post.js";
 import feeder from "./page/feeds.js";
 import { friends, people_you_may_know } from "./page/friends.js";
 import profile from "./page/profile.js";
-
     function createpage(page,data){
         document.getElementById('roots').innerHTML +=`
             <div id="page-${page}" class="w-100 h-100  bg-light overflow-auto flex-shrink-0" style="scroll-snap-align: center;">${data}</div>
         `;
     }
-    export const loader_board='http://'+window.location.hostname+':3000/data.php';
+export const loader_board =window.location.protocol + '//' + window.location.host + '/data.php';
+
     window.addEventListener('DOMContentLoaded',async()=>{
         const formdata=new FormData();
         formdata.append('action','feeds');
