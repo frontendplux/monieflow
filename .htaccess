@@ -1,0 +1,8 @@
+RewriteEngine On
+
+# If file or folder exists, serve it normally
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+
+# Otherwise send everything to master.php
+RewriteRule ^(.*)$ master.php [L,QSA,NC]
