@@ -1,3 +1,23 @@
 {
-    "scripts": {"x":"php -S 0.0.0.0:3000"}
+    "scripts": {
+        "x": "php -S 0.0.0.0:3000"
+    },
+    "name": "demflow",
+    "version": "1.0.0",
+    "description": "",
+    "main": "api.js",
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/frontendplux/monieflow.git"
+    },
+    "keywords": [],
+    "author": "",
+    "license": "ISC",
+    "bugs": {
+        "url": "https://github.com/frontendplux/monieflow/issues"
+    },
+    "homepage": "https://github.com/frontendplux/monieflow#readme",
+    "devDependencies": {
+        "browser-sync": "^3.0.4"
+    }
 }

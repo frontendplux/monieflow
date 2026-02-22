@@ -1,0 +1,39 @@
+<div class="h-100 w-100 position-relative">
+   <canvas id="myCanvas" class="w-100 bg-warning top-0 position-absolute"></canvas>
+   <div class="position-absolute p-3 bottom-25 start-0 end-0 d-flex gap-3 align-items-center" style="z-index: 1000;">
+        <span data-href="home" class="ri-arrow-left-s-line fs-4 bg-white rounded-circle px-2 py-1"></span>
+        <span class="shadow"><img src="https://picsum.photos/200/300?random=3" class="overflow-hidden bg-white p-1 rounded-3" width="50px" height="50px" alt=""></span>
+        <span class="rounded shadow" style="width: 50px;height: 50px; background: white; display: flex; align-items: center; justify-content: center;"><i class="ri-pencil-fill fs-1"></i></span>
+   </div>
+<div class="" style=""></div>
+   <div class="position-absolute px-3 w-100" style="bottom: 49px; height: 30px">
+       <!-- <span class="ri-arrow-left-s-line fs-4"></span> -->
+       <div style="height: 100%;width: 5px;background: blue;" class="position-absolute"></div>
+       <div style="height: 100%;width: 5px;background: red;left: 40px;" class="position-absolute"></div>
+       <canvas id="reels-canva-2" class="bg-light rounded-3 w-100 h-100"></canvas>
+   </div>
+</div>
+
+<script>
+    const reel_canvas_2=document.getElementById('reels-canva-2');
+    reel_canvas_2.width=window.innerWidth;
+</script>
+
+<script>
+  const canvas = document.getElementById('myCanvas');
+  canvas.height=window.innerHeight;
+  canvas.width=window.innerWidth;
+  const ctx = canvas.getContext('2d');
+
+
+  // Set font style
+  ctx.font = "20px Arial";
+  ctx.fillStyle = "blue"; // text color
+
+  // Draw text at position (x, y)
+//   ctx.fillText("Hello Monieflow!", 50, 100,50,50);
+
+  // Optional: add stroke text (outline)
+  ctx.strokeStyle = "blue";
+  ctx.strokeText("Outlined Text <br> \s giugi", 100, 140);
+</script>

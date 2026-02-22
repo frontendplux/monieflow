@@ -1,5 +1,5 @@
-import feeds, { create_post } from "./pages/feeds.js";
-import profile from "./pages/profile.js";
+import feeds, { create_post } from "../pages/feeds.js";
+import profile from "../pages/profile.js";
 
 export default async function LoadAllPage(){
   const fd=new FormData();
@@ -9,11 +9,11 @@ export default async function LoadAllPage(){
     const user_profile=req.user_info[1].data;
     // const user_profile_compo=JSON.parse(user_profile.profile);
     // console.log(req);
-    feeds(req,user_profile);
-    create_post(user_profile);
-    update_feeds(req.feed,0,1)
-    show_Pages();
-    profile();
+    // feeds(req,user_profile);
+    // create_post(user_profile);
+    // update_feeds(req.feed,0,1)
+    // show_Pages();
+    // profile();
 }
 
 export  function header(data = {page:"home"}){

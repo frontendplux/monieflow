@@ -30,6 +30,3 @@ switch ($route) {
         break;
 }
 ?>
-<pre>
-    <?= print_r($new->friends()); ?>
-</pre>

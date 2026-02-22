@@ -4,7 +4,7 @@
     public function __construct($conn) { 
             parent::__construct($conn); 
         }
-    //   =================feeds programs=====================================
+    //   =================friends package=====================================
     public function friends($limit = 0) {
     $user_id = $this->getUserData()['data']['id'] ?? 1;
     // Get other users
