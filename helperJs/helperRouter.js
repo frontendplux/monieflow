@@ -1,4 +1,4 @@
-import Assets from "../pages/assets.js";
+import Assets from "../pages/gssets.js";
 import Login, { ForgotPassword, isloggedin, SignupPage, visibilityToggle } from "../pages/auth.js";
 import Bank from "../pages/bank.js";
 import Chat from "../pages/chat.js";
