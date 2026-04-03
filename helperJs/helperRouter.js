@@ -1,7 +1,7 @@
 import Assets from "/pages/gssets.js";
 import Login, { ForgotPassword, isloggedin, SignupPage, visibilityToggle } from "/pages/auth.js";
 import Bank from "/pages/bank.js";
-import Chat from "/pages/chat.js";
+// import Chat from "/pages/chat.js";
 import Comments from "/pages/comment.js";
 import { CreateFeedPageTemplate, CreateFeedPageTemplateFunction } from "/pages/create.js";
 import Home from "/pages/feeds.js";
@@ -86,7 +86,7 @@ async function handleRouteChange(path) {
             break;
         
         case "/chat":
-            app.innerHTML = await Chat();
+            // app.innerHTML = await Chat();
             break;
         case "/transfer":
             app.innerHTML = await Transfer();
