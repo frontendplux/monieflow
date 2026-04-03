@@ -19,7 +19,7 @@ jobs:
           server: ${{ secrets.HOST_NAME }}
           username: ${{ secrets.FTP_USER }}
           password: ${{ secrets.FTP_PASS }}
-          server-dir: ./htdocs         # Remote path (adjust if needed)
+          server-dir: ./htdocs/        # Remote path (adjust if needed)
           local-dir: ./           # Upload local project root
           exclude: |
             **/.git*
