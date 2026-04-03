@@ -1,15 +1,15 @@
-import Assets from "../pages/gssets.js";
-import Login, { ForgotPassword, isloggedin, SignupPage, visibilityToggle } from "../pages/auth.js";
-import Bank from "../pages/bank.js";
-import Chat from "../pages/chat.js";
-import Comments from "../pages/comment.js";
-import { CreateFeedPageTemplate, CreateFeedPageTemplateFunction } from "../pages/create.js";
-import Home from "../pages/feeds.js";
-import Notifications from "../pages/notify.js";
-import Profile, { EditProfile } from "../pages/Profile.js";
-import Connections from "../pages/squard.js";
-import Trading, { cartjsfunction } from "../pages/trade.js";
-import Transfer, { TransactionStatus } from "../pages/transfer.js";
+import Assets from "/pages/gssets.js";
+import Login, { ForgotPassword, isloggedin, SignupPage, visibilityToggle } from "/pages/auth.js";
+import Bank from "/pages/bank.js";
+import Chat from "/pages/chat.js";
+import Comments from "/pages/comment.js";
+import { CreateFeedPageTemplate, CreateFeedPageTemplateFunction } from "/pages/create.js";
+import Home from "/pages/feeds.js";
+import Notifications from "/pages/notify.js";
+import Profile, { EditProfile } from "/pages/Profile.js";
+import Connections from "/pages/squard.js";
+import Trading, { cartjsfunction } from "/pages/trade.js";
+import Transfer, { TransactionStatus } from "/pages/transfer.js";
 
 window.router = (path) => {
     const currentRoute = window.location.pathname;
