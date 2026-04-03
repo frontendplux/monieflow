@@ -1,5 +1,5 @@
-import { Feed } from "../helperJs/helperfeeds.js";
-import { Footer } from "./feeds.js";
+import { Feed } from "/helperJs/helperfeeds.js";
+import { Footer } from "/pages/feeds.js";
 
 export default async function Chat() {
     // 1. CHAT STATE
