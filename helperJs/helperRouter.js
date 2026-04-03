@@ -1,7 +1,7 @@
 import Assets from "/pages/gssets.js";
 import Login, { ForgotPassword, isloggedin, SignupPage, visibilityToggle } from "/pages/auth.js";
 import Bank from "/pages/bank.js";
-import Chat from "/pages/chatter.js";
+import Chat from "/pages/mess.js";
 // import Chat from "/pages/chat.js";
 import Comments from "/pages/comment.js";
 import { CreateFeedPageTemplate, CreateFeedPageTemplateFunction } from "/pages/create.js";
