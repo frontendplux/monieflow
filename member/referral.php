@@ -24,8 +24,80 @@ if (!$user) {
     exit();
 }
 
-// Ensure referral code exists (fallback to username or UID)
-$refCode = $user['username'] ?? $user['uid'];
+// 2. Localization & Multi-Currency Engine
+// Base referral reward value internal to system (10 NGN)
+define('BASE_REWARD_NGN', 10.00); 
+
+// Detect client IP address
+$userIp = $_SERVER['HTTP_CLIENT_IP'] ?? $_SERVER['HTTP_X_FORWARDED_FOR'] ?? $_SERVER['REMOTE_ADDR'] ?? '127.0.0.1';
+if (strpos($userIp, ',') !== false) {
+    $userIp = trim(explode(',', $userIp)[0]);
+}
+
+// Fetch IP Geolocation data (fallback to USD/NGN if localhost or lookup fails)
+$userCurrency = $user['currency'] ?? 'NGN'; 
+$currencySymbol = '₦';
+
+if ($userIp !== '127.0.0.1' && $userIp !== '::1') {
+    $geoJson = @file_get_contents("http://ip-api.com/json/{$userIp}?fields=currency,status");
+    if ($geoJson) {
+        $geoData = json_decode($geoJson, true);
+        if (!empty($geoData['currency'])) {
+            $userCurrency = $geoData['currency'];
+        }
+    }
+}
+
+// Map Currency Symbols
+$currencySymbols = [
+    'NGN' => '₦',
+    'USD' => '$',
+    'GBP' => '£',
+    'EUR' => '€',
+    'GHS' => 'GH₵',
+    'KES' => 'KSh',
+    'ZAR' => 'R'
+];
+$currencySymbol = $currencySymbols[$userCurrency] ?? $userCurrency . ' ';
+
+/**
+ * Fetch live exchange rates against NGN
+ * Returns exchange rate: 1 NGN = X Local Currency
+ */
+function getExchangeRateToLocal($targetCurrency) {
+    if ($targetCurrency === 'NGN') return 1.0;
+
+    // Cache rate in session to prevent API rate-limiting
+    if (isset($_SESSION['exchange_rates'][$targetCurrency])) {
+        return $_SESSION['exchange_rates'][$targetCurrency];
+    }
+
+    $apiUrl = "https://open.er-api.com/v6/latest/NGN";
+    $json = @file_get_contents($apiUrl);
+    if ($json) {
+        $data = json_decode($json, true);
+        if ($data && isset($data['rates'][$targetCurrency])) {
+            $_SESSION['exchange_rates'][$targetCurrency] = (float)$data['rates'][$targetCurrency];
+            return $_SESSION['exchange_rates'][$targetCurrency];
+        }
+    }
+
+    // Fallback static conversion safety net
+    $fallbacks = ['USD' => 0.00067, 'GBP' => 0.00053, 'EUR' => 0.00062, 'GHS' => 0.010, 'KES' => 0.086];
+    return $fallbacks[$targetCurrency] ?? 1.0;
+}
+
+$rateToLocal = getExchangeRateToLocal($userCurrency);
+
+// Calculate 10 NGN equivalent in user's detected local currency
+$userRewardInLocal = BASE_REWARD_NGN * $rateToLocal;
+
+// Convert reward to MF Tokens (Assuming 1 MF Token = 1 Unit of Local Currency or Custom Ratio)
+// E.g., If 1 MF = 1 Local Currency unit:
+$rewardInMF = $userRewardInLocal; 
+
+// Ensure referral code exists
+$refCode = $user['uid'];
 $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? "https" : "http";
 $referralLink = $protocol . "://" . $_SERVER['HTTP_HOST'] . "/register.php?ref=" . urlencode($refCode);
 
@@ -97,18 +169,6 @@ $recentReferrals = $listStmt->get_result()->fetch_all(MYSQLI_ASSOC);
             justify-content: center;
             font-size: 1.4rem;
         }
-
-        .mobile-bottom-nav {
-            position: fixed;
-            bottom: 0; left: 0; right: 0;
-            background: #ffffff;
-            border-top: 1px solid rgba(0, 168, 232, 0.15);
-            z-index: 1030;
-        }
-
-        .mobile-bottom-nav .nav-link { color: var(--text-muted); font-size: 0.72rem; padding: 8px 0; text-align: center; }
-        .mobile-bottom-nav .nav-link.active { color: var(--brand-skyblue); }
-        .mobile-bottom-nav i { font-size: 1.25rem; display: block; }
     </style>
 </head>
 <body>
@@ -132,7 +192,7 @@ $recentReferrals = $listStmt->get_result()->fetch_all(MYSQLI_ASSOC);
         <!-- Header Title -->
         <div class="mb-4">
             <h1 class="h3 fw-bold mb-1">Refer & Earn MF</h1>
-            <p class="text-muted small">Invite your friends to MonieFlow and earn MF rewards for every active user!</p>
+            <p class="text-muted small">Invite your friends to MonieFlow and earn instant MF rewards on every registration!</p>
         </div>
 
         <!-- Referral Link Banner -->
@@ -140,7 +200,12 @@ $recentReferrals = $listStmt->get_result()->fetch_all(MYSQLI_ASSOC);
             <div class="row align-items-center g-3">
                 <div class="col-12 col-md-7">
                     <h5 class="fw-bold mb-2"><i class="bi bi-gift me-2"></i>Your Referral Link</h5>
-                    <p class="small opacity-75 mb-3">Share this link to claim 10 MF for each friend who registers.</p>
+                    <!-- Hidden internal NGN calculation; displaying local currency + MF value -->
+                    <p class="small opacity-90 mb-3">
+                        Share this link to claim <strong><?= number_format($rewardInMF, 2) ?> MF</strong> 
+                        <span class="opacity-75">(~<?= htmlspecialchars($currencySymbol . number_format($userRewardInLocal, 2)) ?> <?= htmlspecialchars($userCurrency) ?>)</span> 
+                        for each friend who registers.
+                    </p>
                     <div class="input-group">
                         <input type="text" class="form-control border-0 fw-semibold" id="refLinkInput" value="<?= htmlspecialchars($referralLink) ?>" readonly>
                         <button class="btn btn-dark px-4" onclick="copyRefLink()"><i class="bi bi-copy me-1"></i> Copy</button>
@@ -214,18 +279,7 @@ $recentReferrals = $listStmt->get_result()->fetch_all(MYSQLI_ASSOC);
 
     </main>
 
-    <!-- Bottom Mobile Nav -->
-    <div class="mobile-bottom-nav d-lg-none">
-        <div class="container">
-            <div class="row text-center g-0">
-                <div class="col"><a href="/member/index.php" class="nav-link"><i class="bi bi-house-door"></i><span>Home</span></a></div>
-                <div class="col"><a href="/member/chart.php" class="nav-link"><i class="bi bi-graph-up"></i><span>Chart</span></a></div>
-                <div class="col"><a href="/member/tasks.php" class="nav-link"><i class="bi bi-check2-square"></i><span>Tasks</span></a></div>
-                <div class="col"><a href="/member/referral.php" class="nav-link active"><i class="bi bi-person-plus"></i><span>Referral</span></a></div>
-                <div class="col"><a href="/member/settings.php" class="nav-link"><i class="bi bi-gear"></i><span>Settings</span></a></div>
-            </div>
-        </div>
-    </div>
+    <?php $page='refferral'; include __DIR__."/nav-xs.php"; ?>
 
     <script>
         function copyRefLink() {

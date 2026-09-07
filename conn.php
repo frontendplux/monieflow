@@ -17,7 +17,7 @@ if (in_array($db_server_name, $local_hosts, true)) {
     // InfinityFree
     define('DB_HOST', 'sql213.infinityfree.com');
     define('DB_USER', 'if0_42199151');
-    define('DB_PASSWORD', 'YOUR_PASSWORD');
+    define('DB_PASSWORD', 'zbE6df5QKx');
     define('DB_NAME', 'if0_42199151_monieflow');
 }
 // Connect to MySQL

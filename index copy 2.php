@@ -8,9 +8,7 @@ if (isset($_GET['ref']) && !empty($_GET['ref'])) {
     $_SESSION['referrer_uid'] = trim($_GET['ref']);
 }
 
-/**
- * Helper function to return JSON responses for AJAX calls
- */
+// Helper function to return JSON responses for AJAX
 function sendJsonResponse($status, $message, $data = []) {
     header('Content-Type: application/json');
     echo json_encode(['status' => $status, 'message' => $message, 'data' => $data]);
@@ -18,94 +16,7 @@ function sendJsonResponse($status, $message, $data = []) {
 }
 
 /**
- * Gets client IP address safely considering reverse proxies / Cloudflare
- */
-function getUserIP() {
-    if (!empty($_SERVER['HTTP_CLIENT_IP'])) {
-        return $_SERVER['HTTP_CLIENT_IP'];
-    } elseif (!empty($_SERVER['HTTP_X_FORWARDED_FOR'])) {
-        $ips = explode(',', $_SERVER['HTTP_X_FORWARDED_FOR']);
-        return trim($ips[0]);
-    }
-    return $_SERVER['REMOTE_ADDR'] ?? '127.0.0.1';
-}
-
-/**
- * Fetches ISO currency code based on IP location using GeoIP API
- */
-function getUserCurrencyByIP($ip) {
-    if ($ip === '127.0.0.1' || $ip === '::1') {
-        return 'NGN'; // Development fallback
-    }
-    
-    $ch = curl_init("http://ip-api.com/json/{$ip}?fields=status,currency");
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($ch, CURLOPT_TIMEOUT, 3);
-    $response = curl_exec($ch);
-    curl_close($ch);
-
-    if ($response) {
-        $data = json_decode($response, true);
-        if (isset($data['status']) && $data['status'] === 'success' && !empty($data['currency'])) {
-            return strtoupper($data['currency']);
-        }
-    }
-
-    return 'NGN'; // Default fallback
-}
-
-/**
- * Fetches the rate of any currency directly from monieflow_coin_values table
- */
-function getCoinRateFromDB($conn, $currencyCode) {
-    $stmt = $conn->prepare("SELECT amount FROM monieflow_coin_values WHERE currency_code = ? LIMIT 1");
-    $stmt->bind_param("s", $currencyCode);
-    $stmt->execute();
-    $result = $stmt->get_result();
-
-    if ($row = $result->fetch_assoc()) {
-        return (float)$row['amount'];
-    }
-
-    return null; // Return null if currency does not exist in DB
-}
-
-/**
- * Calculates dynamic reward: (10 NGN / Target Currency Rate) * Current DB MF Rate
- * ALL calculations and rate sources are completely driven by the monieflow_coin_values table.
- */
-function calculateDynamicReferralReward($conn, $userIp) {
-    $baseNgn = 10.00;
-    $userCurrency = getUserCurrencyByIP($userIp);
-
-    // 1. Fetch current dynamic MF coin rate directly from DB
-    $mfRate = getCoinRateFromDB($conn, 'MF');
-    if ($mfRate === null || $mfRate <= 0) {
-        $mfRate = 1.00; // Hard fallback if MF isn't configured in DB
-    }
-
-    // 2. Fetch current dynamic User Country Currency rate directly from DB
-    $countryRate = getCoinRateFromDB($conn, $userCurrency);
-
-    // If country currency rate isn't found in DB, fallback to NGN
-    if ($countryRate === null || $countryRate <= 0) {
-        $countryRate = getCoinRateFromDB($conn, 'NGN') ?? 1.00;
-        $userCurrency = 'NGN';
-    }
-
-    // 3. Formula: (10.00 NGN / Country Rate) * Current MF Coin Rate
-    $finalRewardAmount = ($baseNgn / $countryRate) * $mfRate;
-
-    return [
-        'amount'   => round($finalRewardAmount, 8), // High precision decimal math
-        'currency' => $userCurrency,
-        'country_rate' => $countryRate,
-        'mf_rate'      => $mfRate
-    ];
-}
-
-/**
- * Generates a collision-proof unique UID formatted like 'usr-435a'
+ * Generates a collision-proof unique UID formatted like 'usr-435' or 'usr-92a1'
  */
 function generateUniqueUID($conn) {
     do {
@@ -165,7 +76,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         $updateStmt->bind_param("si", $hashedPin, $row['id']);
         $updateStmt->execute();
     } else {
-        // User does not exist -> Generate unique UID and Token
+        // User does not exist -> Generate guaranteed unique UID and Token
         $userEmail = filter_var($identifier, FILTER_VALIDATE_EMAIL) ? $identifier : $identifier . '@monieflow.com';
         $username = explode('@', $identifier)[0];
         
@@ -187,20 +98,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                 $checkRef->execute();
                 
                 if ($checkRef->get_result()->num_rows > 0) {
-                    $userIp = getUserIP();
-                    
-                    // Fetch dynamic calculated values from database
-                    $rewardData   = calculateDynamicReferralReward($conn, $userIp);
-                    $rewardAmount = $rewardData['amount'];
-                    $currencyCode = $rewardData['currency'];
-
-                    // Record referral using database-computed rates
-                    $refStmt = $conn->prepare("INSERT INTO referrals (referrer_uid, referred_uid, reward_mf, currency, status) VALUES (?, ?, ?, ?, 'completed')");
-                    $refStmt->bind_param("ssds", $referrerUid, $uid, $rewardAmount, $currencyCode);
+                    // Record referral
+                    $refStmt = $conn->prepare("INSERT INTO referrals (referrer_uid, referred_uid, reward_mf, status) VALUES (?, ?, 10.0000, 'completed')");
+                    $refStmt->bind_param("ss", $referrerUid, $uid);
                     $refStmt->execute();
                 }
                 
-                // Clear referral session key once successfully processed
+                // Clear referral session key once recorded
                 unset($_SESSION['referrer_uid']);
             }
         }
@@ -634,3 +538,5 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 
 </body>
 </html>
+referral reward has to be base on ip location currency exchange because i am only given 10 ngn in mf 
+some

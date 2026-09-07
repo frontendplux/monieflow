@@ -3,14 +3,8 @@ session_start();
 include __DIR__ . '/conn.php';
 include __DIR__ . '/mailler.php';
 
-// Capture referral code if present in URL parameter and store in session
-if (isset($_GET['ref']) && !empty($_GET['ref'])) {
-    $_SESSION['referrer_uid'] = trim($_GET['ref']);
-}
 
-/**
- * Helper function to return JSON responses for AJAX calls
- */
+// Helper function to return JSON responses for AJAX
 function sendJsonResponse($status, $message, $data = []) {
     header('Content-Type: application/json');
     echo json_encode(['status' => $status, 'message' => $message, 'data' => $data]);
@@ -18,97 +12,11 @@ function sendJsonResponse($status, $message, $data = []) {
 }
 
 /**
- * Gets client IP address safely considering reverse proxies / Cloudflare
- */
-function getUserIP() {
-    if (!empty($_SERVER['HTTP_CLIENT_IP'])) {
-        return $_SERVER['HTTP_CLIENT_IP'];
-    } elseif (!empty($_SERVER['HTTP_X_FORWARDED_FOR'])) {
-        $ips = explode(',', $_SERVER['HTTP_X_FORWARDED_FOR']);
-        return trim($ips[0]);
-    }
-    return $_SERVER['REMOTE_ADDR'] ?? '127.0.0.1';
-}
-
-/**
- * Fetches ISO currency code based on IP location using GeoIP API
- */
-function getUserCurrencyByIP($ip) {
-    if ($ip === '127.0.0.1' || $ip === '::1') {
-        return 'NGN'; // Development fallback
-    }
-    
-    $ch = curl_init("http://ip-api.com/json/{$ip}?fields=status,currency");
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($ch, CURLOPT_TIMEOUT, 3);
-    $response = curl_exec($ch);
-    curl_close($ch);
-
-    if ($response) {
-        $data = json_decode($response, true);
-        if (isset($data['status']) && $data['status'] === 'success' && !empty($data['currency'])) {
-            return strtoupper($data['currency']);
-        }
-    }
-
-    return 'NGN'; // Default fallback
-}
-
-/**
- * Fetches the rate of any currency directly from monieflow_coin_values table
- */
-function getCoinRateFromDB($conn, $currencyCode) {
-    $stmt = $conn->prepare("SELECT amount FROM monieflow_coin_values WHERE currency_code = ? LIMIT 1");
-    $stmt->bind_param("s", $currencyCode);
-    $stmt->execute();
-    $result = $stmt->get_result();
-
-    if ($row = $result->fetch_assoc()) {
-        return (float)$row['amount'];
-    }
-
-    return null; // Return null if currency does not exist in DB
-}
-
-/**
- * Calculates dynamic reward: (10 NGN / Target Currency Rate) * Current DB MF Rate
- * ALL calculations and rate sources are completely driven by the monieflow_coin_values table.
- */
-function calculateDynamicReferralReward($conn, $userIp) {
-    $baseNgn = 10.00;
-    $userCurrency = getUserCurrencyByIP($userIp);
-
-    // 1. Fetch current dynamic MF coin rate directly from DB
-    $mfRate = getCoinRateFromDB($conn, 'MF');
-    if ($mfRate === null || $mfRate <= 0) {
-        $mfRate = 1.00; // Hard fallback if MF isn't configured in DB
-    }
-
-    // 2. Fetch current dynamic User Country Currency rate directly from DB
-    $countryRate = getCoinRateFromDB($conn, $userCurrency);
-
-    // If country currency rate isn't found in DB, fallback to NGN
-    if ($countryRate === null || $countryRate <= 0) {
-        $countryRate = getCoinRateFromDB($conn, 'NGN') ?? 1.00;
-        $userCurrency = 'NGN';
-    }
-
-    // 3. Formula: (10.00 NGN / Country Rate) * Current MF Coin Rate
-    $finalRewardAmount = ($baseNgn / $countryRate) * $mfRate;
-
-    return [
-        'amount'   => round($finalRewardAmount, 8), // High precision decimal math
-        'currency' => $userCurrency,
-        'country_rate' => $countryRate,
-        'mf_rate'      => $mfRate
-    ];
-}
-
-/**
- * Generates a collision-proof unique UID formatted like 'usr-435a'
+ * Generates a collision-proof unique UID formatted like 'usr-435' or 'usr-92a1'
  */
 function generateUniqueUID($conn) {
     do {
+        // Generates random alphanumeric string prefixed with 'usr-'
         $uid = 'usr-' . substr(bin2hex(random_bytes(3)), 0, 4);
         
         $stmt = $conn->prepare("SELECT id FROM users WHERE uid = ?");
@@ -165,50 +73,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         $updateStmt->bind_param("si", $hashedPin, $row['id']);
         $updateStmt->execute();
     } else {
-        // User does not exist -> Generate unique UID and Token
+        // User does not exist -> Generate guaranteed unique UID and Token
         $userEmail = filter_var($identifier, FILTER_VALIDATE_EMAIL) ? $identifier : $identifier . '@monieflow.com';
         $username = explode('@', $identifier)[0];
         
-        $uid = generateUniqueUID($conn);
-        $dummyToken = generateUniqueToken($conn);
+        $uid = generateUniqueUID($conn);        // Format: usr-xxxx
+        $dummyToken = generateUniqueToken($conn); // Unique cryptographically secure token
         $fullName = '';
+        $phone = '';                             // Phone allowed to be null
 
         $insertStmt = $conn->prepare("INSERT INTO users (uid, token, full_name, username, email, password) VALUES (?, ?, ?, ?, ?, ?)");
         $insertStmt->bind_param("ssssss", $uid, $dummyToken, $fullName, $username, $userEmail, $hashedPin);
-        
-        if ($insertStmt->execute()) {
-            // Check for referral tracking in session
-            $referrerUid = $_SESSION['referrer_uid'] ?? '';
-            
-            if (!empty($referrerUid) && $referrerUid !== $uid) {
-                // Verify referrer exists in database
-                $checkRef = $conn->prepare("SELECT id FROM users WHERE uid = ?");
-                $checkRef->bind_param("s", $referrerUid);
-                $checkRef->execute();
-                
-                if ($checkRef->get_result()->num_rows > 0) {
-                    $userIp = getUserIP();
-                    
-                    // Fetch dynamic calculated values from database
-                    $rewardData   = calculateDynamicReferralReward($conn, $userIp);
-                    $rewardAmount = $rewardData['amount'];
-                    $currencyCode = $rewardData['currency'];
-
-                    // Record referral using database-computed rates
-                    $refStmt = $conn->prepare("INSERT INTO referrals (referrer_uid, referred_uid, reward_mf, currency, status) VALUES (?, ?, ?, ?, 'completed')");
-                    $refStmt->bind_param("ssds", $referrerUid, $uid, $rewardAmount, $currencyCode);
-                    $refStmt->execute();
-                }
-                
-                // Clear referral session key once successfully processed
-                unset($_SESSION['referrer_uid']);
-            }
-        }
+        $insertStmt->execute();
     }
 
     // Send formatted HTML verification email
     $subject = "Your MonieFlow Verification Code";
     
+    // Split PIN into individual digits for UI rendering
     $pinDigits = str_split($pin);
     $pinHtml = '';
     foreach ($pinDigits as $digit) {
@@ -228,29 +110,39 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             <tr>
                 <td align="center">
                     <table border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 500px; background-color: #ffffff; border-radius: 16px; border: 1px solid rgba(0, 168, 232, 0.15); box-shadow: 0 10px 30px rgba(0, 168, 232, 0.05); overflow: hidden;">
+                        
+                        <!-- Header Banner -->
                         <tr>
                             <td align="center" style="background-color: #00a8e8; padding: 32px 20px;">
                                 <img src="https://' . ($_SERVER['HTTP_HOST'] ?? 'localhost') . '/logo.png" alt="MonieFlow Logo" width="60" height="60" style="display: block; border-radius: 50%; background-color: #ffffff; padding: 4px; margin-bottom: 12px;">
                                 <h1 style="color: #ffffff; font-size: 22px; font-weight: 700; margin: 0; letter-spacing: -0.3px;">MonieFlow Verification</h1>
                             </td>
                         </tr>
+
+                        <!-- Content Body -->
                         <tr>
                             <td style="padding: 36px 32px; text-align: center;">
                                 <h2 style="color: #1e293b; font-size: 20px; font-weight: 600; margin: 0 0 12px 0;">Authentication Required</h2>
                                 <p style="color: #64748b; font-size: 14px; line-height: 22px; margin: 0 0 28px 0;">Use the 4-digit code below to complete your login. This code will expire shortly.</p>
+                                
+                                <!-- OTP Box Display -->
                                 <table border="0" cellpadding="0" cellspacing="0" align="center" style="margin: 0 auto 28px auto;">
                                     <tr>
                                         ' . $pinHtml . '
                                     </tr>
                                 </table>
+
                                 <p style="color: #64748b; font-size: 13px; line-height: 20px; margin: 0;">If you did not request this code, please ignore this email or contact support if you have security concerns.</p>
                             </td>
                         </tr>
+
+                        <!-- Footer -->
                         <tr>
                             <td style="background-color: #f8fafc; padding: 20px 32px; border-top: 1px solid #e2e8f0; text-align: center;">
                                 <p style="color: #94a3b8; font-size: 12px; margin: 0; line-height: 18px;">&copy; ' . date('Y') . ' MonieFlow Inc. All rights reserved.<br>Perform seamless financial transactions with ease.</p>
                             </td>
                         </tr>
+
                     </table>
                 </td>
             </tr>
@@ -260,6 +152,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 
     sendMail($userEmail, $subject, $emailBody);
     
+    // Set initial session
     $_SESSION['suid'] = $uid;
     $_SESSION['email'] = $userEmail;
 
@@ -281,6 +174,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         sendJsonResponse(false, 'Invalid session or missing verification parameters.');
     }
 
+    // Validate PIN against stored password hash
     $stmt = $conn->prepare("SELECT id, password FROM users WHERE uid = ? AND email = ?");
     $stmt->bind_param("ss", $suid, $sessionEmail);
     $stmt->execute();
@@ -288,12 +182,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 
     if ($row = $result->fetch_assoc()) {
         if (password_verify($pin, $row['password'])) {
+            // Generate a fresh, guaranteed non-colliding session token
             $newToken = generateUniqueToken($conn);
             
             $updateStmt = $conn->prepare("UPDATE users SET token = ? WHERE id = ?");
             $updateStmt->bind_param("si", $newToken, $row['id']);
             $updateStmt->execute();
 
+            // Set final secure session variables
             $_SESSION['suid'] = $suid;
             $_SESSION['token'] = $newToken;
 
@@ -313,6 +209,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    
     <title>MonieFlow - Welcome Back!</title>
     <meta name="description" content="Welcome to MonieFlow. Perform seamless financial transactions, make multiple transfers, and manage your finances with ease.">
     <meta name="keywords" content="MonieFlow, finance app, seamless transfers, manage finances, online banking">
@@ -327,7 +224,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     <link rel="icon" type="image/svg+xml" href="/logo.png">
 
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
+
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -634,3 +533,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 
 </body>
 </html>
+
+we have only one way login/signup
+when user uses client code he should the register check and confirm
+then place inside of these table 
+CREATE TABLE IF NOT EXISTS `referrals` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `referrer_uid` VARCHAR(64) NOT NULL,
+  `referred_uid` VARCHAR(64) NOT NULL,
+  `reward_mf` DECIMAL(18, 4) DEFAULT 10.0000,
+  `status` ENUM('pending', 'completed') DEFAULT 'completed',
+  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  INDEX (`referrer_uid`),
+  INDEX (`referred_uid`)
+);
