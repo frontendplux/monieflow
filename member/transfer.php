@@ -34,11 +34,95 @@ if (!$sender) {
     exit();
 }
 
-// Fetch Sender Wallet Balance & Account Details
+// Fetch Sender Wallet Balance
 $stmt = $conn->prepare("SELECT * FROM wallets WHERE uid = ?");
 $stmt->bind_param("s", $sender['uid']);
 $stmt->execute();
 $senderWallet = $stmt->get_result()->fetch_assoc();
+
+// 3. Helper Functions for Geo IP & Currency Resolution
+function getClientIP() {
+    $ipkeys = ['HTTP_CLIENT_IP', 'HTTP_X_FORWARDED_FOR', 'HTTP_X_FORWARDED', 'HTTP_FORWARDED_FOR', 'HTTP_FORWARDED', 'REMOTE_ADDR'];
+    foreach ($ipkeys as $key) {
+        if (!empty($_SERVER[$key])) {
+            foreach (explode(',', $_SERVER[$key]) as $ip) {
+                $ip = trim($ip);
+                if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE) !== false) {
+                    return $ip;
+                }
+            }
+        }
+    }
+    return $_SERVER['REMOTE_ADDR'] ?? '';
+}
+
+function getUserCountryCode() {
+    if (!empty($_SESSION['user_country_code'])) {
+        return $_SESSION['user_country_code'];
+    }
+
+    if (!empty($_SERVER['HTTP_CF_IPCOUNTRY'])) {
+        $_SESSION['user_country_code'] = strtoupper($_SERVER['HTTP_CF_IPCOUNTRY']);
+        return $_SESSION['user_country_code'];
+    }
+
+    $ip = getClientIP();
+    if (empty($ip)) {
+        $_SESSION['user_country_code'] = 'NG';
+        return 'NG';
+    }
+
+    $geoUrl = "http://ip-api.com/json/" . urlencode($ip) . "?fields=countryCode";
+    $ch = curl_init();
+    curl_setopt_array($ch, [
+        CURLOPT_URL => $geoUrl,
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_TIMEOUT => 2,
+        CURLOPT_CONNECTTIMEOUT => 2
+    ]);
+    
+    $response = curl_exec($ch);
+    curl_close($ch);
+    
+    if ($response) {
+        $json = json_decode($response, true);
+        if (!empty($json['countryCode'])) {
+            $_SESSION['user_country_code'] = strtoupper($json['countryCode']);
+            return $_SESSION['user_country_code'];
+        }
+    }
+
+    $_SESSION['user_country_code'] = 'NG';
+    return 'NG';
+}
+
+// 4. Resolve User Currency & Rate from monieflow_coin_values
+$userCountryCode = getUserCountryCode();
+
+$rateStmt = $conn->prepare("SELECT country, currency_code, amount FROM monieflow_coin_values WHERE country_code = ? LIMIT 1");
+$rateStmt->bind_param("s", $userCountryCode);
+$rateStmt->execute();
+$currencyData = $rateStmt->get_result()->fetch_assoc();
+
+if (!$currencyData) {
+    $defaultCode = 'NG';
+    $rateStmt = $conn->prepare("SELECT country, currency_code, amount FROM monieflow_coin_values WHERE country_code = ? LIMIT 1");
+    $rateStmt->bind_param("s", $defaultCode);
+    $rateStmt->execute();
+    $currencyData = $rateStmt->get_result()->fetch_assoc();
+}
+
+$userCountryName = $currencyData['country'] ?? 'Nigeria';
+$userCurrencyCode = $currencyData['currency_code'] ?? 'NGN';
+$userRate = (float)($currencyData['amount'] ?? 1.00);
+
+$currencySymbols = [
+    'USD' => '$', 'EUR' => '€', 'GBP' => '£', 'NGN' => '₦', 'GHS' => 'GH₵',
+    'KES' => 'KSh', 'ZAR' => 'R', 'INR' => '₹', 'CAD' => 'CA$', 'AUD' => 'A$',
+    'AED' => 'AED ', 'CNY' => '¥', 'JPY' => '¥', 'CHF' => 'CHF ', 'BRL' => 'R$',
+    'EGP' => 'E£', 'RWF' => 'FRw ', 'UGX' => 'USh ', 'TZS' => 'TSh ', 'XAF' => 'FCFA '
+];
+$userCurrencySymbol = $currencySymbols[$userCurrencyCode] ?? $userCurrencyCode . ' ';
 
 // -----------------------------------------------------------------------------
 // AJAX API ENDPOINTS
@@ -52,11 +136,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         $recipientInput = trim($_POST['recipient'] ?? '');
 
         if (empty($recipientInput)) {
-            echo json_encode(['status' => false, 'message' => 'Please enter account number or UID.']);
+            echo json_encode(['status' => false, 'message' => 'Please enter an account number or UID.']);
             exit();
         }
 
-        // Search by Account Number or UID
         $query = "SELECT u.full_name, u.username, u.uid, w.account_number 
                   FROM users u 
                   JOIN wallets w ON u.uid = w.uid 
@@ -89,78 +172,81 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     // Action B: Process Transfer
     if ($action === 'process_transfer') {
         $recipientUid = trim($_POST['recipient_uid'] ?? '');
-        $amount = floatval($_POST['amount'] ?? 0);
+        $mfAmount = filter_var($_POST['mf_amount'] ?? 0, FILTER_VALIDATE_FLOAT);
         $note = trim($_POST['description'] ?? 'Fund Transfer');
 
-        if (empty($recipientUid) || $amount <= 0) {
+        if (empty($recipientUid) || !$mfAmount || $mfAmount <= 0) {
             echo json_encode(['status' => false, 'message' => 'Invalid transfer parameters.']);
             exit();
         }
 
-        if ($senderWallet['balance'] < $amount) {
-            echo json_encode(['status' => false, 'message' => 'Insufficient wallet balance.']);
-            exit();
-        }
-
-        // Verify recipient exists
-        $rStmt = $conn->prepare("SELECT uid FROM users WHERE uid = ? AND is_active = TRUE");
-        $rStmt->bind_param("s", $recipientUid);
-        $rStmt->execute();
-        $recipientUser = $rStmt->get_result()->fetch_assoc();
-
-        if (!$recipientUser) {
-            echo json_encode(['status' => false, 'message' => 'Invalid recipient selected.']);
-            exit();
-        }
-
-        // Perform Transfer with Database Transaction
         $conn->begin_transaction();
 
         try {
-            // 1. Debit Sender Wallet
+            // Lock and fetch current balance
+            $walletStmt = $conn->prepare("SELECT balance FROM wallets WHERE uid = ? FOR UPDATE");
+            $walletStmt->bind_param("s", $sender['uid']);
+            $walletStmt->execute();
+            $currentWallet = $walletStmt->get_result()->fetch_assoc();
+            $senderBalance = (float)($currentWallet['balance'] ?? 0);
+
+            if ($senderBalance < $mfAmount) {
+                $conn->rollback();
+                echo json_encode(['status' => false, 'message' => 'Insufficient wallet balance.']);
+                exit();
+            }
+
+            // Verify recipient
+            $rStmt = $conn->prepare("SELECT uid, username FROM users WHERE uid = ? AND is_active = TRUE");
+            $rStmt->bind_param("s", $recipientUid);
+            $rStmt->execute();
+            $recipientUser = $rStmt->get_result()->fetch_assoc();
+
+            if (!$recipientUser) {
+                $conn->rollback();
+                echo json_encode(['status' => false, 'message' => 'Invalid recipient selected.']);
+                exit();
+            }
+
+            // 1. Debit Sender Wallet (MF)
             $debitStmt = $conn->prepare("UPDATE wallets SET balance = balance - ? WHERE uid = ? AND balance >= ?");
-            $debitStmt->bind_param("dsd", $amount, $sender['uid'], $amount);
+            $debitStmt->bind_param("dsd", $mfAmount, $sender['uid'], $mfAmount);
             $debitStmt->execute();
 
             if ($debitStmt->affected_rows === 0) {
                 throw new Exception("Transfer failed due to insufficient funds.");
             }
 
-            // 2. Credit Receiver Wallet
+            // 2. Credit Receiver Wallet (MF)
             $creditStmt = $conn->prepare("UPDATE wallets SET balance = balance + ? WHERE uid = ?");
-            $creditStmt->bind_param("ds", $amount, $recipientUid);
+            $creditStmt->bind_param("ds", $mfAmount, $recipientUid);
             $creditStmt->execute();
 
             // 3. Log Sender Transaction (Debit)
-            $senderDesc = "Transfer to " . $recipientUid . ($note ? " ($note)" : "");
+            $senderDesc = "Transfer to @" . $recipientUser['username'] . ($note ? " ($note)" : "");
             $sTx = $conn->prepare("INSERT INTO transaction (uid, amount, type, description) VALUES (?, ?, 'debit', ?)");
-            $sTx->bind_param("sds", $sender['uid'], $amount, $senderDesc);
+            $sTx->bind_param("sds", $sender['uid'], $mfAmount, $senderDesc);
             $sTx->execute();
 
             // 4. Log Receiver Transaction (Credit)
-            $receiverDesc = "Transfer from " . $sender['username'] . ($note ? " ($note)" : "");
+            $receiverDesc = "Transfer from @" . $sender['username'] . ($note ? " ($note)" : "");
             $rTx = $conn->prepare("INSERT INTO transaction (uid, amount, type, description) VALUES (?, ?, 'credit', ?)");
-            $rTx->bind_param("sds", $recipientUid, $amount, $receiverDesc);
+            $rTx->bind_param("sds", $recipientUid, $mfAmount, $receiverDesc);
             $rTx->execute();
 
-            // Commit Transaction
             $conn->commit();
 
-            // Get Updated Balance
-            $newBalStmt = $conn->prepare("SELECT balance FROM wallets WHERE uid = ?");
-            $newBalStmt->bind_param("s", $sender['uid']);
-            $newBalStmt->execute();
-            $newWallet = $newBalStmt->get_result()->fetch_assoc();
+            $newBalance = $senderBalance - $mfAmount;
 
             echo json_encode([
                 'status' => true,
-                'message' => 'Transfer of ₦' . number_format($amount, 2) . ' was successful!',
-                'new_balance' => number_format($newWallet['balance'], 2)
+                'message' => 'Transfer of ' . number_format($mfAmount, 2) . ' MF was successful!',
+                'new_balance' => number_format($newBalance, 2)
             ]);
 
         } catch (Exception $e) {
             $conn->rollback();
-            echo json_encode(['status' => false, 'message' => $e->getMessage()]);
+            echo json_encode(['status' => false, 'message' => 'Transfer failed. Please try again.']);
         }
         exit();
     }
@@ -226,29 +312,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             color: #ffffff;
         }
 
-        .mobile-bottom-nav {
-            position: fixed;
-            bottom: 0; left: 0; right: 0;
-            background: #ffffff;
-            border-top: 1px solid rgba(0, 168, 232, 0.15);
-            z-index: 1030;
-            box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.05);
+        .mf-symbol {
+            font-weight: 700;
+            color: var(--brand-skyblue-hover);
         }
 
-        .mobile-bottom-nav .nav-link {
-            color: var(--text-muted);
-            font-size: 0.72rem;
-            padding: 8px 0;
-            text-align: center;
+        .currency-badge {
+            font-size: 0.75rem;
+            background-color: rgba(0, 168, 232, 0.1);
+            color: var(--brand-skyblue-hover);
+            padding: 4px 8px;
+            border-radius: 6px;
         }
-
-        .mobile-bottom-nav .nav-link.active { color: var(--brand-skyblue); }
-        .mobile-bottom-nav i { font-size: 1.25rem; display: block; margin-bottom: 2px; }
     </style>
 </head>
-<body>
+<body 
+    data-exchange-rate="<?= $userRate ?>" 
+    data-currency-code="<?= htmlspecialchars($userCurrencyCode) ?>" 
+    data-currency-symbol="<?= htmlspecialchars($userCurrencySymbol) ?>"
+    data-country-name="<?= htmlspecialchars($userCountryName) ?>">
 
-    <!-- Header / Navbar -->
     <nav class="navbar navbar-expand-lg bg-white border-bottom sticky-top">
         <div class="container">
             <a class="navbar-brand d-flex align-items-center gap-2 fw-bold" href="/member/index.php">
@@ -264,7 +347,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         </div>
     </nav>
 
-    <!-- Main Content -->
     <main class="container py-4 px-3">
         <div class="row justify-content-center">
             <div class="col-12 col-md-8 col-lg-6">
@@ -275,47 +357,57 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                             <i class="bi bi-arrow-up-right-circle fs-2 text-primary"></i>
                         </div>
                         <h4 class="fw-bold mb-1">Transfer Funds</h4>
-                        <p class="text-muted small mb-0">Balance: <strong id="currentBalance">₦<?= number_format($senderWallet['balance'], 2) ?></strong></p>
+                        <p class="text-muted small mb-1">Available Balance: <strong id="currentBalance"><?= number_format($senderWallet['balance'] ?? 0, 2) ?></strong> <span class="mf-symbol">MF</span></p>
+                        <div id="localBalancePreview" class="text-muted extra-small"></div>
                     </div>
 
-                    <!-- Alert Box -->
                     <div id="alertContainer"></div>
 
                     <form id="transferForm">
                         <input type="hidden" id="confirmedRecipientUid" name="recipient_uid">
+                        <input type="hidden" id="mfAmountInput" name="mf_amount" value="0">
 
-                        <!-- Recipient Input & Verify Button -->
                         <div class="mb-3">
                             <label class="form-label fw-semibold small">Recipient Account No. or UID</label>
-                            <div class="input-group">
-                                <input type="text" class="form-control" id="recipientInput" placeholder="Enter Acc No. or UID" required>
-                                <button class="btn btn-outline-secondary" type="button" id="verifyBtn" onclick="verifyRecipient()">
-                                    <span id="verifyBtnSpinner" class="spinner-border spinner-border-sm d-none me-1"></span>
-                                    Verify
-                                </button>
+                            <div class="position-relative">
+                                <input type="text" class="form-control" id="recipientInput" placeholder="Enter Acc No. or UID" autocomplete="off" required>
+                                <div id="verifySpinner" class="spinner-border spinner-border-sm text-primary position-absolute end-0 top-50 translate-middle-y me-3 d-none" role="status"></div>
                             </div>
                         </div>
 
-                        <!-- Recipient Badge Details -->
                         <div id="recipientBadge" class="p-3 mb-3 bg-light border rounded-3 d-none">
-                            <small class="text-muted d-block" style="font-size: 0.75rem;">Verified Account</small>
-                            <span class="fw-bold text-success" id="recipientName">---</span>
-                            <small class="text-muted d-block" id="recipientAccount">Account: ---</small>
+                            <div class="d-flex align-items-center">
+                                <i class="bi bi-check-circle-fill text-success fs-5 me-2"></i>
+                                <div>
+                                    <span class="fw-bold text-dark d-block" id="recipientName">---</span>
+                                    <small class="text-muted" id="recipientAccount">Account: ---</small>
+                                </div>
+                            </div>
                         </div>
 
-                        <!-- Amount Input -->
                         <div class="mb-3">
-                            <label class="form-label fw-semibold small">Amount (₦)</label>
-                            <input type="number" step="0.01" min="1" class="form-control form-control-lg fw-bold" id="amountInput" placeholder="0.00" required>
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <label for="localAmount" class="form-label fw-semibold small mb-0">Amount (<span class="userCurrencyCode"><?= htmlspecialchars($userCurrencyCode) ?></span>)</label>
+                                <span class="text-muted extra-small" style="font-size: 0.8rem;">1 MF = <?= number_format($userRate, 2) ?> <?= htmlspecialchars($userCurrencyCode) ?></span>
+                            </div>
+                            <div class="input-group input-group-lg">
+                                <span class="input-group-text bg-white fw-bold userCurrencySymbol"><?= htmlspecialchars($userCurrencySymbol) ?></span>
+                                <input type="number" step="any" min="0.01" class="form-control fw-bold" id="localAmount" placeholder="0.00" required>
+                            </div>
                         </div>
 
-                        <!-- Description Input -->
+                        <div class="card bg-light border-0 p-3 mb-4">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <span class="text-muted small fw-semibold">RECIPIENT RECEIVES (MF):</span>
+                                <span class="fs-5 fw-bold text-primary"><span id="mfCalculation">0.00</span> MF</span>
+                            </div>
+                        </div>
+
                         <div class="mb-4">
                             <label class="form-label fw-semibold small">Description (Optional)</label>
                             <input type="text" class="form-control" id="descInput" placeholder="What is this transfer for?">
                         </div>
 
-                        <!-- Submit Button -->
                         <button type="submit" class="btn btn-skyblue btn-lg w-100 py-3 rounded-3" id="submitTransferBtn" disabled>
                             <span id="submitSpinner" class="spinner-border spinner-border-sm d-none me-2"></span>
                             Send Money
@@ -327,46 +419,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         </div>
     </main>
 
-    <!-- Small Screen Bottom Nav -->
-    <div class="mobile-bottom-nav d-lg-none">
-        <div class="container">
-            <div class="row text-center g-0">
-                <div class="col">
-                    <a href="/member/index.php" class="nav-link">
-                        <i class="bi bi-house-door"></i>
-                        <span>Home</span>
-                    </a>
-                </div>
-                <div class="col">
-                    <a href="/member/deposit.php" class="nav-link">
-                        <i class="bi bi-arrow-down-circle"></i>
-                        <span>Deposit</span>
-                    </a>
-                </div>
-                <div class="col">
-                    <a href="/member/transfer.php" class="nav-link active">
-                        <i class="bi bi-arrow-up-right-circle"></i>
-                        <span>Transfer</span>
-                    </a>
-                </div>
-                <div class="col">
-                    <a href="#" class="nav-link">
-                        <i class="bi bi-people"></i>
-                        <span>P2P</span>
-                    </a>
-                </div>
-                <div class="col">
-                    <a href="#" class="nav-link">
-                        <i class="bi bi-gear"></i>
-                        <span>Settings</span>
-                    </a>
-                </div>
-            </div>
-        </div>
-    </div>
+    <?php $page='transfer'; include __DIR__."/nav-xs.php"; ?>
 
-    <!-- JavaScript Fetch API Implementation -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>
+        const bodyDataset = document.body.dataset;
+        const exchangeRate = parseFloat(bodyDataset.exchangeRate) || 1.0; 
+        const userCurrency = bodyDataset.currencyCode || 'NGN';
+        const userSymbol = bodyDataset.currencySymbol || '₦';
+
+        // Localized Balance Initialization
+        function initLocalBalance() {
+            const rawBalance = parseFloat(document.getElementById('currentBalance').textContent.replace(/,/g, '')) || 0;
+            const localBalance = rawBalance * exchangeRate;
+            document.getElementById('localBalancePreview').textContent = `≈ ${userSymbol}${localBalance.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})} ${userCurrency}`;
+        }
+        initLocalBalance();
+
         function showAlert(type, message) {
             const container = document.getElementById('alertContainer');
             container.innerHTML = `
@@ -376,69 +445,86 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 </div>`;
         }
 
-        async function verifyRecipient() {
-            const recipientInput = document.getElementById('recipientInput').value.trim();
-            const verifyBtn = document.getElementById('verifyBtn');
-            const spinner = document.getElementById('verifyBtnSpinner');
-            const badge = document.getElementById('recipientBadge');
-            const submitBtn = document.getElementById('submitTransferBtn');
+        // Live Debounced Recipient Verification
+        let fetchTimer;
+        const recipientInput = document.getElementById('recipientInput');
+        const verifySpinner = document.getElementById('verifySpinner');
+        const recipientBadge = document.getElementById('recipientBadge');
+        const submitBtn = document.getElementById('submitTransferBtn');
+        const confirmedUid = document.getElementById('confirmedRecipientUid');
 
-            if (!recipientInput) {
-                showAlert('danger', 'Please enter a valid Account Number or UID.');
-                return;
-            }
+        recipientInput.addEventListener('input', function() {
+            clearTimeout(fetchTimer);
+            const val = this.value.trim();
 
-            verifyBtn.disabled = true;
-            spinner.classList.remove('d-none');
+            recipientBadge.classList.add('d-none');
+            submitBtn.disabled = true;
+            confirmedUid.value = '';
 
+            if (val.length < 3) return;
+
+            verifySpinner.classList.remove('d-none');
+            fetchTimer = setTimeout(() => autoVerifyRecipient(val), 500);
+        });
+
+        async function autoVerifyRecipient(val) {
             const formData = new FormData();
             formData.append('action', 'verify_recipient');
-            formData.append('recipient', recipientInput);
+            formData.append('recipient', val);
 
             try {
-                const response = await fetch('/member/transfer.php', {
+                const response = await fetch(window.location.href, {
                     method: 'POST',
                     body: formData
                 });
                 const result = await response.json();
 
                 if (result.status) {
-                    document.getElementById('confirmedRecipientUid').value = result.uid;
+                    confirmedUid.value = result.uid;
                     document.getElementById('recipientName').innerText = result.name + ' (@' + result.username + ')';
                     document.getElementById('recipientAccount').innerText = 'Account: ' + result.account;
-                    badge.classList.remove('d-none');
+                    recipientBadge.classList.remove('d-none');
                     submitBtn.disabled = false;
-                    showAlert('success', 'Recipient account verified successfully.');
                 } else {
-                    badge.classList.add('d-none');
-                    submitBtn.disabled = true;
-                    document.getElementById('confirmedRecipientUid').value = '';
                     showAlert('danger', result.message);
                 }
             } catch (err) {
-                showAlert('danger', 'Unable to verify recipient. Please try again.');
+                showAlert('danger', 'Unable to verify recipient.');
             } finally {
-                verifyBtn.disabled = false;
-                spinner.classList.add('d-none');
+                verifySpinner.classList.add('d-none');
             }
         }
 
-        // Form Submit handler via Fetch
+        // Calculation of Local Amount to MF Balance
+        document.getElementById('localAmount').addEventListener('input', function() {
+            const localVal = parseFloat(this.value) || 0;
+            const mfVal = localVal / exchangeRate;
+            
+            document.getElementById('mfCalculation').textContent = mfVal.toFixed(2);
+            document.getElementById('mfAmountInput').value = mfVal.toFixed(4);
+        });
+
+        // Submit Form via Fetch
         document.getElementById('transferForm').addEventListener('submit', async function(e) {
             e.preventDefault();
 
-            const recipientUid = document.getElementById('confirmedRecipientUid').value;
-            const amount = document.getElementById('amountInput').value;
+            const recipientUid = confirmedUid.value;
+            const mfAmount = parseFloat(document.getElementById('mfAmountInput').value) || 0;
+            const localVal = parseFloat(document.getElementById('localAmount').value) || 0;
             const description = document.getElementById('descInput').value;
-            const submitBtn = document.getElementById('submitTransferBtn');
             const spinner = document.getElementById('submitSpinner');
 
             if (!recipientUid) {
-                showAlert('danger', 'Please verify the recipient before sending funds.');
+                showAlert('danger', 'Please enter a valid recipient account.');
                 return;
             }
 
-            if (!confirm(`Are you sure you want to transfer ₦${parseFloat(amount).toLocaleString('en-US', {minimumFractionDigits: 2})}?`)) {
+            if (mfAmount <= 0) {
+                showAlert('danger', 'Please enter a valid amount.');
+                return;
+            }
+
+            if (!confirm(`Confirm transfer of ${userSymbol}${localVal.toLocaleString()} (${mfAmount.toFixed(2)} MF)?`)) {
                 return;
             }
 
@@ -448,11 +534,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             const formData = new FormData();
             formData.append('action', 'process_transfer');
             formData.append('recipient_uid', recipientUid);
-            formData.append('amount', amount);
+            formData.append('mf_amount', mfAmount);
             formData.append('description', description);
 
             try {
-                const response = await fetch('/member/transfer.php', {
+                const response = await fetch(window.location.href, {
                     method: 'POST',
                     body: formData
                 });
@@ -460,13 +546,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 
                 if (result.status) {
                     showAlert('success', result.message);
-                    document.getElementById('currentBalance').innerText = '₦' + result.new_balance;
+                    document.getElementById('currentBalance').innerText = result.new_balance;
+                    initLocalBalance();
                     
-                    // Reset form fields
                     document.getElementById('transferForm').reset();
-                    document.getElementById('recipientBadge').classList.add('d-none');
-                    document.getElementById('confirmedRecipientUid').value = '';
-                    window.location.href = '/member/index.php'; // Redirect to dashboard after successful transfer
+                    recipientBadge.classList.add('d-none');
+                    confirmedUid.value = '';
+                    document.getElementById('mfCalculation').textContent = '0.00';
+                    document.getElementById('mfAmountInput').value = '0';
+
+                    setTimeout(() => {
+                        window.location.href = '/member/index.php';
+                    }, 1200);
                 } else {
                     showAlert('danger', result.message);
                     submitBtn.disabled = false;
@@ -479,6 +570,5 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             }
         });
     </script>
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>

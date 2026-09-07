@@ -37,6 +37,7 @@ CREATE TABLE IF NOT EXISTS monieflow_coin_chart_table (
 );
 
 INSERT INTO monieflow_coin_values (country_code, country, currency_code, amount) VALUES
+('MF', 'monieflow', 'MF', 1.000000000000000),
 ('NG', 'Nigeria', 'NGN', 1.000000000000000),
 ('US', 'United States', 'USD', 1610.500000000000000),
 ('GB', 'United Kingdom', 'GBP', 2050.250000000000000),

@@ -2,7 +2,7 @@
 session_start();
 include __DIR__ . '/../conn.php';
 
-// Fix: Robust & Non-Blocking CSRF Token Generation
+// Generate CSRF Token
 if (empty($_SESSION['csrf_token'])) {
     $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
 }
@@ -16,7 +16,7 @@ if (!$suid || !$token) {
     exit();
 }
 
-// Fetch user data using Prepared Statements (mysqli OOP)
+// Fetch user data
 $stmt = $conn->prepare("SELECT * FROM users WHERE uid = ? AND token = ? AND is_active = TRUE");
 $stmt->bind_param("ss", $suid, $token);
 $stmt->execute();
@@ -30,41 +30,22 @@ if (!$user) {
 }
 
 // -----------------------------------------------------------------------------
-// IP Geolocation Engine
+// IP Geolocation (Cached in Session to Avoid Slow Third-Party API Calls)
 // -----------------------------------------------------------------------------
-function getClientIP() {
-    // Check Cloudflare or Reverse Proxy Headers First
-    $headers = ['HTTP_CF_CONNECTING_IP', 'HTTP_X_FORWARDED_FOR', 'REMOTE_ADDR'];
-    foreach ($headers as $header) {
-        if (!empty($_SERVER[$header])) {
-            foreach (explode(',', $_SERVER[$header]) as $ip) {
-                $ip = trim($ip);
-                if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE) !== false) {
-                    return $ip;
-                }
-            }
-        }
-    }
-    return $_SERVER['REMOTE_ADDR'] ?? '';
-}
 
 function getUserCountryCode() {
-    if (!empty($_SESSION['user_country_code'])) {
+    if (isset($_SESSION['user_country_code'])) {
         return $_SESSION['user_country_code'];
     }
 
-    // Direct Cloudflare Header Optimization (Bypasses cURL completely if hosted behind CF)
-    if (!empty($_SERVER['HTTP_CF_IPCOUNTRY'])) {
-        $_SESSION['user_country_code'] = strtoupper($_SERVER['HTTP_CF_IPCOUNTRY']);
-        return $_SESSION['user_country_code'];
-    }
-
-    $ip = getClientIP();
-    if (empty($ip)) {
+    $ip = $_SERVER['REMOTE_ADDR'] ?? '';
+    
+    // Default fallback for localhost / private IPs
+    if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE) === false) {
         $_SESSION['user_country_code'] = 'NG';
         return 'NG';
     }
-
+    
     $geoUrl = "http://ip-api.com/json/" . urlencode($ip) . "?fields=countryCode";
     $ch = curl_init();
     curl_setopt_array($ch, [
@@ -91,17 +72,7 @@ function getUserCountryCode() {
 
 $userCountryCode = getUserCountryCode();
 
-// -----------------------------------------------------------------------------
-// Dynamic Multi-Currency Calculation Logic
-// -----------------------------------------------------------------------------
-
-// 1. Fetch System-Wide Base MonieFlow Coin (MF) Value in NGN
-$mfBaseStmt = $conn->prepare("SELECT amount FROM monieflow_coin_values WHERE country_code = 'MF' LIMIT 1");
-$mfBaseStmt->execute();
-$mfBaseData = $mfBaseStmt->get_result()->fetch_assoc();
-$baseMfInNgn = floatval($mfBaseData['amount'] ?? 1.00);
-
-// 2. Fetch User Local Currency Rate (Relative to NGN)
+// Fetch Exchange Rate
 $rateStmt = $conn->prepare("SELECT currency_code, amount FROM monieflow_coin_values WHERE country_code = ? LIMIT 1");
 $rateStmt->bind_param("s", $userCountryCode);
 $rateStmt->execute();
@@ -113,10 +84,10 @@ if (!$rateData) {
 }
 
 $currencyCode = $rateData['currency_code'] ?? 'NGN';
-$targetCurrencyRateInNgn = floatval($rateData['amount'] ?? 1.00);
+$mfExchangeRate = floatval($rateData['amount'] ?? 1.00);
 
 // -----------------------------------------------------------------------------
-// Helper Wallet Functions
+// Helper Functions
 // -----------------------------------------------------------------------------
 function generateUniquePublicId($conn) {
     do {
@@ -169,22 +140,17 @@ function createOrGetWallet($conn, $uid) {
 
 $wallet = createOrGetWallet($conn, $user['uid']);
 $balanceMF = floatval($wallet['balance']);
-
-// CORRECTION: Convert MF to Target Currency via Base NGN Value
-// Formula: (User MF Balance * MF Value in NGN) / Target Currency Rate in NGN
-if ($targetCurrencyRateInNgn > 0) {
-    $fiatEquivalent = ($balanceMF * $baseMfInNgn) / $targetCurrencyRateInNgn;
-} else {
-    $fiatEquivalent = 0.00;
-}
+$fiatEquivalent = $balanceMF * $mfExchangeRate;
 
 // -----------------------------------------------------------------------------
-// Handlers (AJAX & POST)
+// Request Handlers (POST & Logout)
 // -----------------------------------------------------------------------------
 
+// AJAX: Regenerate Credentials
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'regenerate_keys') {
     header('Content-Type: application/json');
     
+    // CSRF Check
     $postedToken = $_POST['csrf_token'] ?? '';
     if (!hash_equals($_SESSION['csrf_token'], $postedToken)) {
         echo json_encode(['status' => false, 'message' => 'Invalid security token.']);
@@ -205,6 +171,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'regen
     exit();
 }
 
+// POST-based Logout
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'logout') {
     $postedToken = $_POST['csrf_token'] ?? '';
     if (hash_equals($_SESSION['csrf_token'], $postedToken)) {
@@ -215,7 +182,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'logou
     exit();
 }
 
-// Transactions query
+// Fetch user recent activity
 $txStmt = $conn->prepare("SELECT description, type, created_at, amount FROM transaction WHERE uid = ? ORDER BY created_at DESC LIMIT 2");
 $txStmt->bind_param("s", $user['uid']);
 $txStmt->execute();
@@ -229,8 +196,12 @@ $transactions = $txStmt->get_result()->fetch_all(MYSQLI_ASSOC);
     <title>MonieFlow - Member Dashboard</title>
     
     <link rel="icon" type="image/png" href="/logo.png">
+
+    <!-- Bootstrap 5 CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Bootstrap Icons -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -328,6 +299,33 @@ $transactions = $txStmt->get_result()->fetch_all(MYSQLI_ASSOC);
             background-color: var(--brand-skyblue-hover);
             color: #ffffff;
         }
+
+        .mobile-bottom-nav {
+            position: fixed;
+            bottom: 0; left: 0; right: 0;
+            background: #ffffff;
+            border-top: 1px solid rgba(0, 168, 232, 0.15);
+            z-index: 1030;
+            box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.05);
+        }
+
+        .mobile-bottom-nav .nav-link {
+            color: var(--text-muted);
+            font-size: 0.72rem;
+            padding: 8px 0;
+            text-align: center;
+        }
+
+        .mobile-bottom-nav .nav-link.active,
+        .mobile-bottom-nav .nav-link:hover {
+            color: var(--brand-skyblue);
+        }
+
+        .mobile-bottom-nav i {
+            font-size: 1.25rem;
+            display: block;
+            margin-bottom: 2px;
+        }
     </style>
 </head>
 <body>
@@ -345,13 +343,9 @@ $transactions = $txStmt->get_result()->fetch_all(MYSQLI_ASSOC);
                     <small class="text-muted d-block" style="font-size: 0.75rem;">Logged in as</small>
                     <span class="fw-semibold small"><?= htmlspecialchars($user['email']) ?></span>
                 </div>
-                <form action="" method="POST" class="m-0">
-                    <input type="hidden" name="action" value="logout">
-                    <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_token']) ?>">
-                    <button type="submit" class="btn btn-outline-danger btn-sm rounded-pill px-3">
-                        <i class="bi bi-box-arrow-right me-1"></i> Logout
-                    </button>
-                </form>
+                <a href="?action=logout" class="btn btn-outline-danger btn-sm rounded-pill px-3">
+                    <i class="bi bi-box-arrow-right me-1"></i> Logout
+                </a>
             </div>
         </div>
     </nav>
@@ -393,7 +387,7 @@ $transactions = $txStmt->get_result()->fetch_all(MYSQLI_ASSOC);
                         </div>
                         <!-- Main Balance in MF -->
                         <h2 class="display-6 fw-bold mb-1"><?= number_format($balanceMF, 2) ?> <span class="fs-5">MF</span></h2>
-                        <!-- Local Fiat Equivalent calculated based on Client Location (Default USA) -->
+                        <!-- Local Fiat Equivalent based on IP -->
                         <small class="opacity-75 d-block mb-3">
                             ≈ <?= htmlspecialchars($currencyCode) ?> <?= number_format($fiatEquivalent, 2) ?> 
                             <span class="badge bg-white text-dark ms-1" style="font-size: 0.65rem; opacity: 0.9;"><?= $userCountryCode ?></span>
@@ -406,7 +400,7 @@ $transactions = $txStmt->get_result()->fetch_all(MYSQLI_ASSOC);
                 </div>
             </div>
 
-            <!-- Action Grid -->
+            <!-- Action Grid (With Referral, Chart, Task, Bidding Added) -->
             <div class="col-12 col-lg-8">
                 <div class="row g-2 g-sm-3">
                     <div class="col-3 col-sm-4 col-md-3">
@@ -516,17 +510,51 @@ $transactions = $txStmt->get_result()->fetch_all(MYSQLI_ASSOC);
 
     </main>
 
-    <?php $page='home'; include __DIR__."/nav-xs.php"; ?>
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="/script.js"></script>
-    <script>
-        const CSRF_TOKEN = <?= json_encode($_SESSION['csrf_token']) ?>;
+    <!-- Mobile Navigation Bar -->
+    <div class="mobile-bottom-nav d-lg-none">
+        <div class="container">
+            <div class="row text-center g-0">
+                <div class="col">
+                    <a href="/member/index.php" class="nav-link active">
+                        <i class="bi bi-house-door"></i>
+                        <span>Home</span>
+                    </a>
+                </div>
+                <div class="col">
+                    <a href="/member/chart.php" class="nav-link">
+                        <i class="bi bi-graph-up"></i>
+                        <span>Chart</span>
+                    </a>
+                </div>
+                <div class="col">
+                    <a href="/member/tasks.php" class="nav-link">
+                        <i class="bi bi-check2-square"></i>
+                        <span>Tasks</span>
+                    </a>
+                </div>
+                <div class="col">
+                    <a href="/member/peer2peer.php" class="nav-link">
+                        <i class="bi bi-people"></i>
+                        <span>P2P</span>
+                    </a>
+                </div>
+                <div class="col">
+                    <a href="/member/settings.php" class="nav-link">
+                        <i class="bi bi-gear"></i>
+                        <span>Settings</span>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
 
+    <!-- Scripts -->
+    <script>
         function copyPublicId(e) {
             e.preventDefault();
             const publicId = document.getElementById('publicIdDisplay').innerText.trim();
             navigator.clipboard.writeText(publicId).then(() => {
-                showDropdownAlert('Public ID copied to clipboard!', 'info');
+                alert('Public ID copied to clipboard!');
             });
         }
 
@@ -536,21 +564,23 @@ $transactions = $txStmt->get_result()->fetch_all(MYSQLI_ASSOC);
 
             const formData = new FormData();
             formData.append('action', 'regenerate_keys');
-            formData.append('csrf_token', CSRF_TOKEN);
 
             try {
                 const response = await fetch('/member/index.php', { method: 'POST', body: formData });
                 const result = await response.json();
                 if (result.status) {
                     document.getElementById('publicIdDisplay').innerText = result.public_id;
-                    showDropdownAlert(result.message,'success', 4000);
+                    alert(result.message);
                 } else {
-                    showDropdownAlert(result.message,'danger', 3000);
+                    alert(result.message);
                 }
             } catch (err) {
-                showDropdownAlert('An error occurred while generating new keys.','warning',3000);
+                alert('An error occurred while generating new keys.');
             }
         }
     </script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
+
+make sure it focus on user current current location

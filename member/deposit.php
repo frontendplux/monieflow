@@ -7,6 +7,11 @@ $suid = $_SESSION['suid'] ?? null;
 $token = $_SESSION['token'] ?? null;
 
 if (!$suid || !$token) {
+    if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+        header('Content-Type: application/json');
+        echo json_encode(['status' => 'error', 'message' => 'Unauthorized session. Please log in again.']);
+        exit();
+    }
     header("Location: /index.php");
     exit();
 }
@@ -20,73 +25,86 @@ $user = $stmt->get_result()->fetch_assoc();
 if (!$user) {
     session_unset();
     session_destroy();
+    if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+        header('Content-Type: application/json');
+        echo json_encode(['status' => 'error', 'message' => 'Invalid session token.']);
+        exit();
+    }
     header("Location: /index.php");
     exit();
 }
 
-$alertMessage = '';
-$alertType = '';
-
-// 3. Handle Deposit Redemption Processing
+// 3. Handle Fetch API Deposit Redemption Processing
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_deposit'])) {
-    $inputUid = trim($_POST['uid'] ?? '');
+    header('Content-Type: application/json');
+
     $inputPin = trim($_POST['pin_code'] ?? '');
 
-    if (empty($inputUid) || empty($inputPin)) {
-        $alertType = 'danger';
-        $alertMessage = 'Please fill in both the UID code and the 6-digit code.';
-    } elseif ($inputUid !== $user['uid']) {
-        $alertType = 'danger';
-        $alertMessage = 'Invalid UID code provided. It must match your account UID.';
-    } else {
-        // Find matching pending deposit record
-        $depositStmt = $conn->prepare("SELECT * FROM deposits WHERE uid = ? AND pin_code = ? AND status = 'pending' LIMIT 1");
-        $depositStmt->bind_param("ss", $inputUid, $inputPin);
+    if (empty($inputPin)) {
+        echo json_encode(['status' => 'error', 'message' => 'Please fill in the deposit code.']);
+        exit();
+    }
+
+    // Begin Database Transaction
+    $conn->begin_transaction();
+
+    try {
+        // FOR UPDATE acquires a row-level write lock to prevent simultaneous double-redemptions by multiple users
+        $depositStmt = $conn->prepare("SELECT * FROM deposits WHERE pin_code = ? AND status = 'pending' LIMIT 1 FOR UPDATE");
+        $depositStmt->bind_param("s", $inputPin);
         $depositStmt->execute();
         $deposit = $depositStmt->get_result()->fetch_assoc();
 
         if (!$deposit) {
-            $alertType = 'danger';
-            $alertMessage = 'Invalid or expired 6-digit code. Please check and try again.';
-        } else {
-            $depositAmount = $deposit['amount'];
-            $depositId = $deposit['id'];
-
-            // Begin Database Transaction to avoid partial state updates
-            $conn->begin_transaction();
-
-            try {
-                // Step A: Update wallet balance
-                $updateWalletStmt = $conn->prepare("UPDATE wallets SET balance = balance + ? WHERE uid = ?");
-                $updateWalletStmt->bind_param("ds", $depositAmount, $inputUid);
-                $updateWalletStmt->execute();
-
-                // Step B: Record transaction entry
-                $description = "Wallet Deposit via Code (" . htmlspecialchars($inputPin) . ")";
-                $payloads = json_encode(['deposit_id' => $depositId, 'pin_code' => $inputPin]);
-
-                $txStmt = $conn->prepare("INSERT INTO transaction (uid, amount, type, description, payloads) VALUES (?, ?, 'credit', ?, ?)");
-                $txStmt->bind_param("sdss", $inputUid, $depositAmount, $description, $payloads);
-                $txStmt->execute();
-
-                // Step C: Delete the redeemed code from deposits table
-                $deleteStmt = $conn->prepare("DELETE FROM deposits WHERE id = ?");
-                $deleteStmt->bind_param("i", $depositId);
-                $deleteStmt->execute();
-
-                // Commit Transaction
-                $conn->commit();
-
-                $alertType = 'success';
-                $alertMessage = 'Deposit successful! ₦' . number_format($depositAmount, 2) . ' has been added to your wallet.';
-
-            } catch (Exception $e) {
-                // Rollback in case of any database error
-                $conn->rollback();
-                $alertType = 'danger';
-                $alertMessage = 'Transaction failed. Please try again later.';
-            }
+            $conn->rollback();
+            echo json_encode(['status' => 'error', 'message' => 'Invalid or already redeemed deposit code.']);
+            exit();
         }
+
+        $depositAmount = $deposit['amount'];
+        $depositId = $deposit['id'];
+        $creatorUid = $deposit['uid'];
+
+        // Step A: Update wallet balance for the CURRENT authenticated user ($user['uid'])
+        $updateWalletStmt = $conn->prepare("UPDATE wallets SET balance = balance + ? WHERE uid = ?");
+        $updateWalletStmt->bind_param("ds", $depositAmount, $user['uid']);
+        $updateWalletStmt->execute();
+
+        // Step B: Record transaction entry for the redeemer
+        $description = "Wallet Deposit via Code (" . htmlspecialchars($inputPin) . ")";
+        $payloads = json_encode([
+            'deposit_id' => $depositId,
+            'pin_code' => $inputPin,
+            'created_by' => $creatorUid
+        ]);
+
+        $txStmt = $conn->prepare("INSERT INTO transaction (uid, amount, type, description, payloads) VALUES (?, ?, 'credit', ?, ?)");
+        $txStmt->bind_param("sdss", $user['uid'], $depositAmount, $description, $payloads);
+        $txStmt->execute();
+
+        // Step C: Delete the redeemed code from deposits table so it can never be queried again
+        $deleteStmt = $conn->prepare("DELETE FROM deposits WHERE id = ?");
+        $deleteStmt->bind_param("i", $depositId);
+        $deleteStmt->execute();
+
+        // Commit Transaction (Releases lock on the row)
+        $conn->commit();
+
+        $_SESSION['flash_message'] = 'Deposit successful! ₦' . number_format($depositAmount, 2) . ' has been added to your wallet.';
+        $_SESSION['flash_type'] = 'success';
+
+        echo json_encode([
+            'status' => 'success', 
+            'message' => 'Deposit successful!', 
+            'redirect' => '/member/index.php'
+        ]);
+        exit();
+
+    } catch (Exception $e) {
+        // Rollback in case of any execution or database error
+        $conn->rollback();
+        echo json_encode(['status' => 'error', 'message' => 'Transaction failed due to a server error. Please try again.']);
+        exit();
     }
 }
 ?>
@@ -155,32 +173,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_deposit'])) {
             background-color: var(--brand-skyblue-hover);
             color: #ffffff;
         }
-
-        .mobile-bottom-nav {
-            position: fixed;
-            bottom: 0; left: 0; right: 0;
-            background: #ffffff;
-            border-top: 1px solid rgba(0, 168, 232, 0.15);
-            z-index: 1030;
-            box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.05);
-        }
-
-        .mobile-bottom-nav .nav-link {
-            color: var(--text-muted);
-            font-size: 0.72rem;
-            padding: 8px 0;
-            text-align: center;
-        }
-
-        .mobile-bottom-nav .nav-link.active {
-            color: var(--brand-skyblue);
-        }
-
-        .mobile-bottom-nav i {
-            font-size: 1.25rem;
-            display: block;
-            margin-bottom: 2px;
-        }
     </style>
 </head>
 <body>
@@ -212,30 +204,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_deposit'])) {
                             <i class="bi bi-arrow-down-circle fs-2"></i>
                         </div>
                         <h4 class="fw-bold mb-1">Redeem Deposit Code</h4>
-                        <p class="text-muted small">Enter your UID code and 6-digit deposit code to fund your wallet.</p>
+                        <p class="text-muted small">Enter your deposit code below to credit your wallet instantly.</p>
                     </div>
 
-                    <?php if (!empty($alertMessage)): ?>
-                        <div class="alert alert-<?= $alertType ?> alert-dismissible fade show" role="alert">
-                            <?= $alertMessage ?>
-                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                        </div>
-                    <?php endif; ?>
+                    <div id="alertContainer"></div>
 
-                    <form action="" method="POST">
-                        <div class="mb-3">
-                            <label for="uid" class="form-label fw-semibold small">User UID Code</label>
-                            <input type="text" class="form-control form-control-lg text-monospace" id="uid" name="uid" value="<?= htmlspecialchars($user['uid']) ?>" required readonly>
-                            <div class="form-text">Auto-filled with your active session UID.</div>
-                        </div>
-
+                    <form id="depositForm">
+                        <input type="hidden" name="submit_deposit" value="1">
+                        
                         <div class="mb-4">
-                            <label for="pin_code" class="form-label fw-semibold small">6-Digit Code (Alphanumeric)</label>
-                            <input type="text" class="form-control form-control-lg text-center fw-bold" id="pin_code" name="pin_code" maxlength="10" placeholder="e.g. X8A92B" required style="letter-spacing: 4px;">
+                            <label for="pin_code" class="form-label fw-semibold small">Deposit Code</label>
+                            <input type="text" class="form-control form-control-lg text-center fw-bold text-uppercase" id="pin_code" name="pin_code" maxlength="10" placeholder="e.g. X8A92B" required style="letter-spacing: 4px;" autocomplete="off">
                         </div>
 
-                        <button type="submit" name="submit_deposit" class="btn btn-skyblue btn-lg w-100 py-3 rounded-3">
-                            <i class="bi bi-wallet2 me-2"></i> Deposit Now
+                        <button type="submit" id="submitBtn" class="btn btn-skyblue btn-lg w-100 py-3 rounded-3 d-flex align-items-center justify-content-center">
+                            <span id="btnSpinner" class="spinner-border spinner-border-sm me-2 d-none" role="status" aria-hidden="true"></span>
+                            <span id="btnText"><i class="bi bi-wallet2 me-2"></i> Redeem Code</span>
                         </button>
                     </form>
                 </div>
@@ -244,44 +228,66 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_deposit'])) {
         </div>
     </main>
 
-    <!-- Small Screen Bottom Navigation Bar -->
-      <div class="mobile-bottom-nav d-lg-none">
-        <div class="container">
-            <div class="row text-center g-0">
-                <div class="col">
-                    <a href="/member/index.php" class="nav-link ">
-                        <i class="bi bi-house-door"></i>
-                        <span>Home</span>
-                    </a>
-                </div>
-                <div class="col">
-                    <a href="/member/deposit.php" class="nav-link active">
-                        <i class="bi bi-arrow-down-circle"></i>
-                        <span>Deposit</span>
-                    </a>
-                </div>
-                <div class="col">
-                    <a href="/member/transfer.php" class="nav-link">
-                        <i class="bi bi-arrow-up-right-circle"></i>
-                        <span>Transfer</span>
-                    </a>
-                </div>
-                <div class="col">
-                    <a href="/member/peer2peer.php" class="nav-link">
-                        <i class="bi bi-people"></i>
-                        <span>P2P</span>
-                    </a>
-                </div>
-                <div class="col">
-                    <a href="/member/settings.php" class="nav-link">
-                        <i class="bi bi-gear"></i>
-                        <span>Settings</span>
-                    </a>
-                </div>
-            </div>
-        </div>
-    </div>
+    <?php $page='deposit'; include __DIR__."/nav-xs.php"; ?>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <script>
+        document.getElementById('depositForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+
+            const form = this;
+            const submitBtn = document.getElementById('submitBtn');
+            const btnSpinner = document.getElementById('btnSpinner');
+            const btnText = document.getElementById('btnText');
+            const alertContainer = document.getElementById('alertContainer');
+
+            alertContainer.innerHTML = '';
+            submitBtn.disabled = true;
+            btnSpinner.classList.remove('d-none');
+
+            try {
+                const formData = new FormData(form);
+                const response = await fetch(window.location.href, {
+                    method: 'POST',
+                    body: formData,
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest'
+                    }
+                });
+
+                const data = await response.json();
+
+                if (data.status === 'success') {
+                    alertContainer.innerHTML = `
+                        <div class="alert alert-success fade show" role="alert">
+                            ${data.message} Redirecting...
+                        </div>
+                    `;
+                    setTimeout(() => {
+                        window.location.href = data.redirect;
+                    }, 1000);
+                } else {
+                    alertContainer.innerHTML = `
+                        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                            ${data.message}
+                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                        </div>
+                    `;
+                    submitBtn.disabled = false;
+                    btnSpinner.classList.add('d-none');
+                }
+            } catch (error) {
+                alertContainer.innerHTML = `
+                    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                        An unexpected network error occurred. Please try again.
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                `;
+                submitBtn.disabled = false;
+                btnSpinner.classList.add('d-none');
+            }
+        });
+    </script>
 </body>
 </html>

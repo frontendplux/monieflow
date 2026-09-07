@@ -4,7 +4,7 @@ $db_server_name = $_SERVER['HTTP_HOST'];
 $local_hosts = [
     'localhost:3001',
     '127.0.0.1',
-    '172.20.10.10'
+    '172.20.10.10:3001'
 ];
 if (in_array($db_server_name, $local_hosts, true)) {
 
