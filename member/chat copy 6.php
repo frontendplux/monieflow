@@ -334,7 +334,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             exit();
         }
 
-        $userPayload = json_decode($user['payloads'] ?? '{}', true);
+        $userPayload = json_decode($user['payload'] ?? '{}', true);
         if (!isset($userPayload['bank']) || !is_array($userPayload['bank'])) {
             $userPayload['bank'] = [];
         }
@@ -655,12 +655,12 @@ $currentEscrow = $curEStmt->get_result()->fetch_assoc();
                                 <strong class="text-dark">Unit Rate: ₦<?= number_format($listing['rate'], 2) ?> / FLOW</strong>
                             </div>
                             <div id="escrowBtnContainer">
-                                <?php if ($currentEscrow && $currentEscrow['status'] === 'locked' && $isSeller): ?>
-                                    <button id="releaseEscrowBtn" onclick="releaseEscrow(<?= (int) $currentEscrow['id'] ?>)" class="btn btn-success btn-sm">
-                                        <i class="bi bi-key me-1"></i> Release Voucher Code
-                                    </button>
-                                <?php elseif ($currentEscrow && $currentEscrow['status'] === 'locked' && $isBuyer): ?>
-                                    <span class="badge bg-warning text-dark"><i class="bi bi-hourglass-split"></i> Payment Pending</span>
+                                <?php if ($currentEscrow && $currentEscrow['status'] === 'locked'): ?>
+                                    <?php if ($isSeller): ?>
+                                        <button onclick="releaseEscrow(<?= (int) $currentEscrow['id'] ?>)" class="btn btn-success btn-sm"><i class="bi bi-key me-1"></i> Release Voucher Code</button>
+                                    <?php else: ?>
+                                        <span class="badge bg-warning text-dark"><i class="bi bi-hourglass-split"></i> Payment Pending</span>
+                                    <?php endif; ?>
                                 <?php elseif ($currentEscrow && $currentEscrow['status'] === 'released'): ?>
                                     <span class="badge bg-success"><i class="bi bi-check-circle me-1"></i> Code Released: <?= htmlspecialchars($currentEscrow['deposit_pin']) ?></span>
                                 <?php else: ?>
@@ -958,11 +958,11 @@ $currentEscrow = $curEStmt->get_result()->fetch_assoc();
                 });
                 box.scrollTop = box.scrollHeight;
 
-                // Manage Escrow Release Controls
+                // Manage Escrow Release Controls with loading + pulse
                 const btnBox = document.getElementById('escrowBtnContainer');
                 if (data.escrow && data.escrow.status === 'locked') {
                     if (data.is_seller) {
-                        const pulseClass = data.proof_submitted ? 'pulse-release' : '';
+                        const pulseClass = data.proof_submitted? 'pulse-release' : '';
                         btnBox.innerHTML = `
                             <button id="releaseEscrowBtn" onclick="releaseEscrow(${data.escrow.id})" class="btn btn-success btn-sm ${pulseClass}">
                                 <i class="bi bi-key me-1"></i> Release Voucher Code
@@ -970,7 +970,7 @@ $currentEscrow = $curEStmt->get_result()->fetch_assoc();
                         if (data.proof_submitted) {
                             btnBox.innerHTML += `<div class="small text-success mt-1"><i class="bi bi-check-circle-fill me-1"></i>Buyer submitted payment proof</div>`;
                         }
-                    } else if (data.is_buyer) {
+                    } else {
                         btnBox.innerHTML = `<span class="badge bg-warning text-dark"><i class="bi bi-hourglass-split"></i> Payment Pending</span>`;
                     }
                 } else if (data.escrow && data.escrow.status === 'released') {
