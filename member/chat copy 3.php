@@ -71,26 +71,6 @@ if (!is_dir($proofUploadDir)) {
 $proofPublicBase = '/uploads/p2p_proofs/';
 
 // -----------------------------------------------------------------------------
-// Escrow release gas fee: 2.5% total, split 1.2% (MF coin value) / 1.3% (company)
-// -----------------------------------------------------------------------------
-define('GAS_FEE_PCT', 0.025);
-define('MF_VALUE_PCT', 0.012);
-define('COMPANY_PROFIT_PCT', 0.013);
-
-// Auto-provision the company profit ledger the same way p2p_chats.seen was
-// added via ALTER ... IF NOT EXISTS — no manual migration step needed.
-$conn->query("CREATE TABLE IF NOT EXISTS profit_mf_company (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    escrow_id INT NOT NULL,
-    listing_id INT NOT NULL,
-    amount DECIMAL(36, 15) NOT NULL,
-    source VARCHAR(50) DEFAULT 'p2p_release_gas_fee',
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT fk_profit_escrow FOREIGN KEY (escrow_id) REFERENCES p2p_escrows(id) ON DELETE CASCADE,
-    CONSTRAINT fk_profit_listing FOREIGN KEY (listing_id) REFERENCES p2p_listings(id) ON DELETE CASCADE
-)");
-
-// -----------------------------------------------------------------------------
 // Helper: mark incoming messages in this conversation as seen by current user
 // -----------------------------------------------------------------------------
 function markConversationSeen($conn, $listingId, $partnerUid, $myUid) {
@@ -349,7 +329,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         $userPayload['bank'][] = $newBank;
         $updatedPayload = json_encode($userPayload);
 
-        $upStmt = $conn->prepare("UPDATE users SET payloads = ? WHERE uid = ?");
+        $upStmt = $conn->prepare("UPDATE users SET payload = ? WHERE uid = ?");
         $upStmt->bind_param("ss", $updatedPayload, $user['uid']);
         $upStmt->execute();
 
@@ -407,46 +387,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 
             if (!$escrow) throw new Exception("Escrow not found or already processed.");
 
-            $grossAmount   = floatval($escrow['amount']);
-            $gasFee        = $grossAmount * GAS_FEE_PCT;        // 2.5% total
-            $mfShare       = $grossAmount * MF_VALUE_PCT;       // 1.2% -> coin value
-            $companyShare  = $grossAmount * COMPANY_PROFIT_PCT; // 1.3% -> company profit
-            $netAmount     = $grossAmount - $gasFee;            // 97.5% -> buyer
-
             $upE = $conn->prepare("UPDATE p2p_escrows SET status = 'released', deposit_pin = ? WHERE id = ?");
             $upE->bind_param("si", $pinCode, $escrowId);
             $upE->execute();
 
-            // Buyer's voucher is funded with the net amount, after the gas fee
             $insDep = $conn->prepare("INSERT INTO deposits (uid, pin_code, amount, status) VALUES (?, ?, ?, 'pending')");
-            $insDep->bind_param("ssd", $escrow['buyer_uid'], $pinCode, $netAmount);
+            $insDep->bind_param("ssd", $escrow['buyer_uid'], $pinCode, $escrow['amount']);
             $insDep->execute();
 
-            // 1.2% appreciates the MF coin's own reference value
-            $mfUpdate = $conn->prepare("UPDATE monieflow_coin_values SET amount = amount + ? WHERE currency_code = 'MF'");
-            $mfUpdate->bind_param("d", $mfShare);
-            $mfUpdate->execute();
-
-            // 1.3% is logged to the company profit ledger
-            $profitStmt = $conn->prepare("INSERT INTO profit_mf_company (escrow_id, listing_id, amount, source) VALUES (?, ?, ?, 'p2p_release_gas_fee')");
-            $profitStmt->bind_param("iid", $escrowId, $listingId, $companyShare);
-            $profitStmt->execute();
-
-            $sysMsg = "Escrow Released!\nGross: " . number_format($grossAmount, 4) . " FLOW\nGas Fee (2.5%): " . number_format($gasFee, 4) . " FLOW\nYou receive: " . number_format($netAmount, 4) . " FLOW\nDeposit Voucher Code: " . $pinCode;
-            $payload = json_encode([
-                'pin_code' => $pinCode,
-                'gross_amount' => $grossAmount,
-                'gas_fee' => $gasFee,
-                'mf_value_share' => $mfShare,
-                'company_share' => $companyShare,
-                'net_amount' => $netAmount,
-            ]);
+            $sysMsg = "Escrow Released! Deposit Voucher Code: " . $pinCode;
+            $payload = json_encode(['pin_code' => $pinCode, 'amount' => $escrow['amount']]);
             $sysStmt = $conn->prepare("INSERT INTO p2p_chats (listing_id, sender_uid, receiver_uid, message, type, payloads) VALUES (?, ?, ?, ?, 'escrow_released', ?)");
             $sysStmt->bind_param("issss", $listingId, $user['uid'], $partnerUid, $sysMsg, $payload);
             $sysStmt->execute();
 
             $conn->commit();
-            echo json_encode(['status' => true, 'message' => 'Redemption code generated! Buyer receives ' . number_format($netAmount, 4) . ' FLOW after the 2.5% gas fee.']);
+            echo json_encode(['status' => true, 'message' => 'Redemption code generated and shared!']);
         } catch (Exception $e) {
             $conn->rollback();
             echo json_encode(['status' => false, 'message' => $e->getMessage()]);
@@ -545,13 +501,6 @@ markConversationSeen($conn, $listingId, $partnerUid, $user['uid']);
 
 // Initial sidebar data for first paint
 $initialConversations = getConversationsForUser($conn, $user['uid'], $listingId, $partnerUid);
-
-// Fetch current escrow up front so the Release button renders immediately on
-// page load instead of waiting for the first AJAX poll to populate it.
-$curEStmt = $conn->prepare("SELECT * FROM p2p_escrows WHERE listing_id = ? AND buyer_uid = ? AND seller_uid = ? ORDER BY id DESC LIMIT 1");
-$curEStmt->bind_param("iss", $listingId, $buyerUid, $sellerUid);
-$curEStmt->execute();
-$currentEscrow = $curEStmt->get_result()->fetch_assoc();
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -654,19 +603,7 @@ $currentEscrow = $curEStmt->get_result()->fetch_assoc();
                                 <small class="text-muted d-block">Trade with <?= htmlspecialchars($partnerUser['username'] ?? 'Partner') ?></small>
                                 <strong class="text-dark">Unit Rate: ₦<?= number_format($listing['rate'], 2) ?> / FLOW</strong>
                             </div>
-                            <div id="escrowBtnContainer">
-                                <?php if ($currentEscrow && $currentEscrow['status'] === 'locked'): ?>
-                                    <?php if ($isSeller): ?>
-                                        <button onclick="releaseEscrow(<?= (int) $currentEscrow['id'] ?>)" class="btn btn-success btn-sm"><i class="bi bi-key me-1"></i> Release Voucher Code</button>
-                                    <?php else: ?>
-                                        <span class="badge bg-warning text-dark"><i class="bi bi-hourglass-split"></i> Payment Pending</span>
-                                    <?php endif; ?>
-                                <?php elseif ($currentEscrow && $currentEscrow['status'] === 'released'): ?>
-                                    <span class="badge bg-success"><i class="bi bi-check-circle me-1"></i> Code Released: <?= htmlspecialchars($currentEscrow['deposit_pin']) ?></span>
-                                <?php else: ?>
-                                    <span class="badge bg-secondary">No Active Escrow</span>
-                                <?php endif; ?>
-                            </div>
+                            <div id="escrowBtnContainer"></div>
                         </div>
                     </div>
                 </div>
@@ -675,8 +612,6 @@ $currentEscrow = $curEStmt->get_result()->fetch_assoc();
                 <div class="escrow-lock-banner mb-3">
                     <i class="bi bi-shield-lock-fill me-1"></i>
                     Funds are locked in escrow the moment an order is placed and can only be released by the seller, after they've personally confirmed payment. Nobody — including the bot — can bypass that manual confirmation.
-                    <br><i class="bi bi-fuel-pump-fill me-1"></i>
-                    A 2.5% gas fee applies when funds are released: the buyer receives 97.5%, 1.2% strengthens the MF coin's value, and 1.3% funds platform operations.
                 </div>
 
                 <!-- Bot Interactive Wizard Modal / Collapse for Buyer -->
@@ -833,325 +768,279 @@ $currentEscrow = $curEStmt->get_result()->fetch_assoc();
     <?php endif; ?>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-   <script>
-    const listingId = <?= $listingId?>;
-    const partnerUid = "<?= $partnerUid?>";
-    const myUid = "<?= $user['uid']?>";
-    const unitRate = <?= floatval($listing['rate'])?>;
-    const initialConversations = <?= json_encode($initialConversations)?>;
+    <script>
+        const listingId = <?= $listingId ?>;
+        const partnerUid = "<?= $partnerUid ?>";
+        const myUid = "<?= $user['uid'] ?>";
+        const unitRate = <?= floatval($listing['rate']) ?>;
+        const initialConversations = <?= json_encode($initialConversations) ?>;
 
-    // NEW: Helper to set loading state on any button
-    function setLoading(btn, isLoading, loadingText = 'Loading...') {
-        if (!btn) return;
-        if (isLoading) {
-            btn.dataset.originalHtml = btn.innerHTML;
-            btn.disabled = true;
-            btn.innerHTML = `<span class="spinner-border spinner-border-sm me-1"></span> ${loadingText}`;
-        } else {
-            btn.disabled = false;
-            btn.innerHTML = btn.dataset.originalHtml || btn.innerHTML;
+        function toggleBotFlow() {
+            document.getElementById('botWorkflow').classList.toggle('d-none');
         }
-    }
 
-    function toggleBotFlow() {
-        document.getElementById('botWorkflow').classList.toggle('d-none');
-    }
+        function calculateFlow() {
+            const fiat = parseFloat(document.getElementById('fiatInput').value || 0);
+            const calculated = fiat > 0 ? (fiat / unitRate).toFixed(4) : "0.0000";
+            document.getElementById('calculatedFlow').innerText = `${calculated} FLOW`;
+        }
 
-    function calculateFlow() {
-        const fiat = parseFloat(document.getElementById('fiatInput').value || 0);
-        const calculated = fiat > 0? (fiat / unitRate).toFixed(4) : "0.0000";
-        document.getElementById('calculatedFlow').innerText = `${calculated} FLOW`;
-    }
+        function timeAgo(dateStr) {
+            const diffMs = Date.now() - new Date(dateStr.replace(' ', 'T')).getTime();
+            const mins = Math.floor(diffMs / 60000);
+            if (mins < 1) return 'now';
+            if (mins < 60) return `${mins}m`;
+            const hrs = Math.floor(mins / 60);
+            if (hrs < 24) return `${hrs}h`;
+            return `${Math.floor(hrs / 24)}d`;
+        }
 
-    function timeAgo(dateStr) {
-        const diffMs = Date.now() - new Date(dateStr.replace(' ', 'T')).getTime();
-        const mins = Math.floor(diffMs / 60000);
-        if (mins < 1) return 'now';
-        if (mins < 60) return `${mins}m`;
-        const hrs = Math.floor(mins / 60);
-        if (hrs < 24) return `${hrs}h`;
-        return `${Math.floor(hrs / 24)}d`;
-    }
+        function initials(name) {
+            if (!name) return '?';
+            return name.trim().split(/\s+/).slice(0, 2).map(w => w[0].toUpperCase()).join('');
+        }
 
-    function initials(name) {
-        if (!name) return '?';
-        return name.trim().split(/\s+/).slice(0, 2).map(w => w[0].toUpperCase()).join('');
-    }
+        function renderConversations(list) {
+            const html = list.map(c => {
+                const previewRaw = c.last_message_type === 'system' ? '🤖 System update' :
+                                    (c.last_message || 'Say hello 👋');
+                const preview = previewRaw.length > 42 ? previewRaw.slice(0, 42) + '…' : previewRaw;
+                const activeClass = c.is_active ? 'active' : '';
+                const badge = c.unseen_count > 0 ? `<span class="convo-unseen">${c.unseen_count}</span>` : '';
+                const label = (c.listing_type === 'buy' ? 'Buying from' : 'Selling to');
 
-    function renderConversations(list) {
-        const html = list.map(c => {
-            const previewRaw = c.last_message_type === 'system'? '🤖 System update' :
-                                (c.last_message || 'Say hello 👋');
-            const preview = previewRaw.length > 42? previewRaw.slice(0, 42) + '…' : previewRaw;
-            const activeClass = c.is_active? 'active' : '';
-            const badge = c.unseen_count > 0? `<span class="convo-unseen">${c.unseen_count}</span>` : '';
-            const label = (c.listing_type === 'buy'? 'Buying from' : 'Selling to');
-
-            return `<a href="/member/chat.php?listing_id=${c.listing_id}&partner=${encodeURIComponent(c.partner_uid)}" class="convo-item ${activeClass}">
-                        <div class="convo-avatar">${initials(c.partner_full_name || c.partner_username)}</div>
-                        <div class="convo-meta">
-                            <div class="d-flex justify-content-between">
-                                <span class="convo-name">${c.partner_full_name || c.partner_username}</span>
-                                <small class="text-muted">${timeAgo(c.last_time)}</small>
+                return `<a href="/member/chat.php?listing_id=${c.listing_id}&partner=${encodeURIComponent(c.partner_uid)}" class="convo-item ${activeClass}">
+                            <div class="convo-avatar">${initials(c.partner_full_name || c.partner_username)}</div>
+                            <div class="convo-meta">
+                                <div class="d-flex justify-content-between">
+                                    <span class="convo-name">${c.partner_full_name || c.partner_username}</span>
+                                    <small class="text-muted">${timeAgo(c.last_time)}</small>
+                                </div>
+                                <div class="convo-preview">${label} · ${preview}</div>
                             </div>
-                            <div class="convo-preview">${label} · ${preview}</div>
-                        </div>
-                        ${badge}
-                    </a>`;
-        }).join('') || `<p class="text-muted small text-center py-4">No trades yet. Start a chat from the marketplace.</p>`;
+                            ${badge}
+                        </a>`;
+            }).join('') || `<p class="text-muted small text-center py-4">No trades yet. Start a chat from the marketplace.</p>`;
 
-        document.getElementById('convoListDesktop').innerHTML = html;
-        document.getElementById('convoListMobile').innerHTML = html;
-    }
+            document.getElementById('convoListDesktop').innerHTML = html;
+            document.getElementById('convoListMobile').innerHTML = html;
+        }
 
-    async function refreshConversations() {
-        const formData = new FormData();
-        formData.append('action', 'fetch_conversations');
-        try {
-            const res = await fetch('', { method: 'POST', body: formData });
-            const data = await res.json();
-            if (data.status) renderConversations(data.conversations);
-        } catch (err) {}
-    }
+        async function refreshConversations() {
+            const formData = new FormData();
+            formData.append('action', 'fetch_conversations');
+            try {
+                const res = await fetch('', { method: 'POST', body: formData });
+                const data = await res.json();
+                if (data.status) renderConversations(data.conversations);
+            } catch (err) {}
+        }
 
-    async function loadChat() {
-        const formData = new FormData();
-        formData.append('action', 'fetch_messages');
-        formData.append('listing_id', listingId);
-        formData.append('partner', partnerUid);
+        async function loadChat() {
+            const formData = new FormData();
+            formData.append('action', 'fetch_messages');
+            formData.append('listing_id', listingId);
+            formData.append('partner', partnerUid);
 
-        try {
-            const res = await fetch('', { method: 'POST', body: formData });
-            const data = await res.json();
+            try {
+                const res = await fetch('', { method: 'POST', body: formData });
+                const data = await res.json();
 
-            if (data.status) {
-                const box = document.getElementById('chatBox');
-                box.innerHTML = '';
+                if (data.status) {
+                    const box = document.getElementById('chatBox');
+                    box.innerHTML = '';
 
-                data.chats.forEach(c => {
-                    const div = document.createElement('div');
-                    if (c.type === 'system' || c.type === 'escrow_released') {
-                        div.className = 'msg-bubble msg-system mx-auto p-2 my-1';
-                        div.innerHTML = `<i class="bi bi-shield-check me-1"></i> ${c.message}`;
+                    data.chats.forEach(c => {
+                        const div = document.createElement('div');
+                        if (c.type === 'system' || c.type === 'escrow_released') {
+                            div.className = 'msg-bubble msg-system mx-auto p-2 my-1';
+                            div.innerHTML = `<i class="bi bi-shield-check me-1"></i> ${c.message}`;
+                        } else {
+                            const isMe = c.sender_uid === data.my_uid;
+                            div.className = `msg-bubble ${isMe ? 'msg-me ms-auto' : 'msg-partner me-auto'}`;
+
+                            let payload = null;
+                            if (c.payloads) {
+                                try { payload = JSON.parse(c.payloads); } catch (e) {}
+                            }
+
+                            const textNode = document.createElement('div');
+                            textNode.innerText = c.message;
+                            div.appendChild(textNode);
+
+                            if (payload && payload.proof && payload.image) {
+                                const img = document.createElement('img');
+                                img.src = payload.image;
+                                img.className = 'msg-proof-img';
+                                img.alt = 'Payment proof screenshot';
+                                div.appendChild(img);
+                            }
+                        }
+                        box.appendChild(div);
+                    });
+                    box.scrollTop = box.scrollHeight;
+
+                    // Manage Escrow Release Controls
+                    const btnBox = document.getElementById('escrowBtnContainer');
+                    if (data.escrow && data.escrow.status === 'locked') {
+                        if (data.is_seller) {
+                            const pulseClass = data.proof_submitted ? 'pulse-release' : '';
+                            btnBox.innerHTML = `<button onclick="releaseEscrow(${data.escrow.id})" class="btn btn-success btn-sm ${pulseClass}"><i class="bi bi-key me-1"></i> Release Voucher Code</button>`;
+                            if (data.proof_submitted) {
+                                btnBox.innerHTML += `<div class="small text-success mt-1"><i class="bi bi-check-circle-fill me-1"></i>Buyer submitted payment proof</div>`;
+                            }
+                        } else {
+                            btnBox.innerHTML = `<span class="badge bg-warning text-dark"><i class="bi bi-hourglass-split"></i> Payment Pending</span>`;
+                        }
+                    } else if (data.escrow && data.escrow.status === 'released') {
+                        btnBox.innerHTML = `<span class="badge bg-success"><i class="bi bi-check-circle me-1"></i> Code Released: ${data.escrow.deposit_pin}</span>`;
                     } else {
-                        const isMe = c.sender_uid === data.my_uid;
-                        div.className = `msg-bubble ${isMe? 'msg-me ms-auto' : 'msg-partner me-auto'}`;
-
-                        let payload = null;
-                        if (c.payloads) {
-                            try { payload = JSON.parse(c.payloads); } catch (e) {}
-                        }
-
-                        const textNode = document.createElement('div');
-                        textNode.innerText = c.message;
-                        div.appendChild(textNode);
-
-                        if (payload && payload.proof && payload.image) {
-                            const img = document.createElement('img');
-                            img.src = payload.image;
-                            img.className = 'msg-proof-img';
-                            img.alt = 'Payment proof screenshot';
-                            div.appendChild(img);
-                        }
+                        btnBox.innerHTML = `<span class="badge bg-secondary">No Active Escrow</span>`;
                     }
-                    box.appendChild(div);
-                });
-                box.scrollTop = box.scrollHeight;
 
-                // Manage Escrow Release Controls with loading + pulse
-                const btnBox = document.getElementById('escrowBtnContainer');
-                if (data.escrow && data.escrow.status === 'locked') {
-                    if (data.is_seller) {
-                        const pulseClass = data.proof_submitted? 'pulse-release' : '';
-                        btnBox.innerHTML = `
-                            <button id="releaseEscrowBtn" onclick="releaseEscrow(${data.escrow.id})" class="btn btn-success btn-sm ${pulseClass}">
-                                <i class="bi bi-key me-1"></i> Release Voucher Code
-                            </button>`;
-                        if (data.proof_submitted) {
-                            btnBox.innerHTML += `<div class="small text-success mt-1"><i class="bi bi-check-circle-fill me-1"></i>Buyer submitted payment proof</div>`;
+                    // Show/hide the buyer's "I've paid" proof prompt
+                    const proofPrompt = document.getElementById('proofPrompt');
+                    if (proofPrompt) {
+                        if (data.is_buyer && data.escrow && data.escrow.status === 'locked') {
+                            proofPrompt.classList.remove('d-none');
+                        } else {
+                            proofPrompt.classList.add('d-none');
                         }
-                    } else {
-                        btnBox.innerHTML = `<span class="badge bg-warning text-dark"><i class="bi bi-hourglass-split"></i> Payment Pending</span>`;
-                    }
-                } else if (data.escrow && data.escrow.status === 'released') {
-                    btnBox.innerHTML = `<span class="badge bg-success"><i class="bi bi-check-circle me-1"></i> Code Released: ${data.escrow.deposit_pin}</span>`;
-                } else {
-                    btnBox.innerHTML = `<span class="badge bg-secondary">No Active Escrow</span>`;
-                }
-
-                // Show/hide the buyer's "I've paid" proof prompt
-                const proofPrompt = document.getElementById('proofPrompt');
-                if (proofPrompt) {
-                    if (data.is_buyer && data.escrow && data.escrow.status === 'locked') {
-                        proofPrompt.classList.remove('d-none');
-                    } else {
-                        proofPrompt.classList.add('d-none');
                     }
                 }
+            } catch (err) {}
+        }
+
+        document.getElementById('chatForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const msgInput = document.getElementById('msgInput');
+            const formData = new FormData();
+            formData.append('action', 'send_message');
+            formData.append('listing_id', listingId);
+            formData.append('partner', partnerUid);
+            formData.append('message', msgInput.value);
+
+            msgInput.value = '';
+            await fetch('', { method: 'POST', body: formData });
+            loadChat();
+        });
+
+        async function initiateEscrowOrder() {
+            const fiatAmount = document.getElementById('fiatInput').value;
+            if (!fiatAmount || fiatAmount <= 0) {
+                alert('Please enter a valid fiat amount.');
+                return;
             }
-        } catch (err) {}
-    }
 
-    document.getElementById('chatForm').addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const msgInput = document.getElementById('msgInput');
-        const formData = new FormData();
-        formData.append('action', 'send_message');
-        formData.append('listing_id', listingId);
-        formData.append('partner', partnerUid);
-        formData.append('message', msgInput.value);
+            if (!confirm(`Are you sure you want to buy ₦${fiatAmount} worth of FLOW?`)) return;
 
-        msgInput.value = '';
-        await fetch('', { method: 'POST', body: formData });
-        loadChat();
-    });
+            const formData = new FormData();
+            formData.append('action', 'initiate_escrow');
+            formData.append('listing_id', listingId);
+            formData.append('partner', partnerUid);
+            formData.append('fiat_amount', fiatAmount);
 
-    async function initiateEscrowOrder() {
-        const fiatAmount = document.getElementById('fiatInput').value;
-        if (!fiatAmount || fiatAmount <= 0) {
-            alert('Please enter a valid fiat amount.');
-            return;
-        }
-
-        if (!confirm(`Are you sure you want to buy ₦${fiatAmount} worth of FLOW?`)) return;
-
-        const btn = document.getElementById('confirmLockBtn');
-        setLoading(btn, true, 'Locking...');
-
-        const formData = new FormData();
-        formData.append('action', 'initiate_escrow');
-        formData.append('listing_id', listingId);
-        formData.append('partner', partnerUid);
-        formData.append('fiat_amount', fiatAmount);
-
-        const res = await fetch('', { method: 'POST', body: formData });
-        const data = await res.json();
-        setLoading(btn, false);
-        alert(data.message);
-        if (data.status) {
-            toggleBotFlow();
-            loadChat();
-        }
-    }
-
-    async function saveBankAccount() {
-        const btn = event.target; // button that was clicked
-        const bankName = document.getElementById('bankNameInput').value;
-        const accNumber = document.getElementById('accNumInput').value;
-        const accName = document.getElementById('accNameInput').value;
-
-        if (!bankName ||!accNumber ||!accName) {
-            alert('Please complete all bank fields.');
-            return;
-        }
-
-        setLoading(btn, true, 'Saving...');
-
-        const formData = new FormData();
-        formData.append('action', 'save_bank_account');
-        formData.append('bank_name', bankName);
-        formData.append('acc_number', accNumber);
-        formData.append('acc_name', accName);
-
-        const res = await fetch('', { method: 'POST', body: formData });
-        const data = await res.json();
-        setLoading(btn, false);
-        alert(data.message);
-        if (data.status) {
-            document.getElementById('bankNameInput').value = '';
-            document.getElementById('accNumInput').value = '';
-            document.getElementById('accNameInput').value = '';
-            bootstrap.Modal.getInstance(document.getElementById('addBankModal')).hide();
-            loadChat();
-        }
-    }
-
-    async function shareBank(bankId) {
-        const btn = event.target.closest('button'); // the list-group button
-        setLoading(btn, true, 'Sending...');
-
-        const formData = new FormData();
-        formData.append('action', 'share_bank');
-        formData.append('bank_id', bankId);
-        formData.append('listing_id', listingId);
-        formData.append('partner', partnerUid);
-
-        const res = await fetch('', { method: 'POST', body: formData });
-        const data = await res.json();
-        setLoading(btn, false);
-        if (data.status) {
-            bootstrap.Modal.getInstance(document.getElementById('selectBankModal')).hide();
-            loadChat();
-        } else {
+            const res = await fetch('', { method: 'POST', body: formData });
+            const data = await res.json();
             alert(data.message);
-        }
-    }
-
-    async function releaseEscrow(escrowId) {
-        if (!confirm('Are you sure payment has been received? A 2.5% gas fee is deducted on release (1.2% to MF coin value, 1.3% to platform), and the buyer gets a redeemable code for the remaining 97.5%.')) return;
-
-        const btn = document.getElementById('releaseEscrowBtn');
-        setLoading(btn, true, 'Releasing...');
-
-        const formData = new FormData();
-        formData.append('action', 'release_escrow');
-        formData.append('escrow_id', escrowId);
-        formData.append('listing_id', listingId);
-        formData.append('partner', partnerUid);
-
-        const res = await fetch('', { method: 'POST', body: formData });
-        const data = await res.json();
-        setLoading(btn, false);
-        alert(data.message);
-        loadChat();
-    }
-
-    async function sendProof() {
-        const reference = document.getElementById('proofReferenceInput').value.trim();
-        const imageFile = document.getElementById('proofImageInput').files[0];
-        const alertBox = document.getElementById('proofAlert');
-        const btn = document.getElementById('sendProofBtn');
-
-        if (!reference &&!imageFile) {
-            alertBox.innerHTML = `<div class="alert alert-danger py-2 small mt-2">Add a reference or a screenshot first.</div>`;
-            return;
+            if (data.status) {
+                toggleBotFlow();
+                loadChat();
+            }
         }
 
-        setLoading(btn, true, 'Sending...');
+        async function saveBankAccount() {
+            const formData = new FormData();
+            formData.append('action', 'save_bank_account');
+            formData.append('bank_name', document.getElementById('bankNameInput').value);
+            formData.append('acc_number', document.getElementById('accNumInput').value);
+            formData.append('acc_name', document.getElementById('accNameInput').value);
 
-        const formData = new FormData();
-        formData.append('action', 'send_proof');
-        formData.append('listing_id', listingId);
-        formData.append('partner', partnerUid);
-        formData.append('reference', reference);
-        if (imageFile) formData.append('proof_image', imageFile);
-
-        try {
             const res = await fetch('', { method: 'POST', body: formData });
             const data = await res.json();
-
+            alert(data.message);
             if (data.status) {
-                alertBox.innerHTML = `<div class="alert alert-success py-2 small mt-2">${data.message}</div>`;
-                setTimeout(() => {
-                    bootstrap.Modal.getInstance(document.getElementById('proofModal')).hide();
-                    loadChat();
-                }, 800);
-            } else {
-                alertBox.innerHTML = `<div class="alert alert-danger py-2 small mt-2">${data.message}</div>`;
+                bootstrap.Modal.getInstance(document.getElementById('addBankModal')).hide();
+                loadChat();
             }
-        } catch (err) {
-            alertBox.innerHTML = `<div class="alert alert-danger py-2 small mt-2">An error occurred.</div>`;
-        } finally {
-            setLoading(btn, false);
         }
-    }
 
-    // Initial paint from server-rendered data, then keep both in sync
-    renderConversations(initialConversations);
-    setInterval(refreshConversations, 8000);
+        async function shareBank(bankId) {
+            const formData = new FormData();
+            formData.append('action', 'share_bank');
+            formData.append('bank_id', bankId);
+            formData.append('listing_id', listingId);
+            formData.append('partner', partnerUid);
 
-    setInterval(loadChat, 3000);
-    loadChat();
-</script>
+            const res = await fetch('', { method: 'POST', body: formData });
+            const data = await res.json();
+            if (data.status) {
+                bootstrap.Modal.getInstance(document.getElementById('selectBankModal')).hide();
+                loadChat();
+            }
+        }
+
+        async function releaseEscrow(escrowId) {
+            if (!confirm('Are you sure payment has been received? This will generate a redeemable code for the buyer.')) return;
+
+            const formData = new FormData();
+            formData.append('action', 'release_escrow');
+            formData.append('escrow_id', escrowId);
+            formData.append('listing_id', listingId);
+            formData.append('partner', partnerUid);
+
+            const res = await fetch('', { method: 'POST', body: formData });
+            const data = await res.json();
+            alert(data.message);
+            loadChat();
+        }
+
+        async function sendProof() {
+            const reference = document.getElementById('proofReferenceInput').value.trim();
+            const imageFile = document.getElementById('proofImageInput').files[0];
+            const alertBox = document.getElementById('proofAlert');
+            const btn = document.getElementById('sendProofBtn');
+
+            if (!reference && !imageFile) {
+                alertBox.innerHTML = `<div class="alert alert-danger py-2 small mt-2">Add a reference or a screenshot first.</div>`;
+                return;
+            }
+
+            btn.disabled = true;
+
+            const formData = new FormData();
+            formData.append('action', 'send_proof');
+            formData.append('listing_id', listingId);
+            formData.append('partner', partnerUid);
+            formData.append('reference', reference);
+            if (imageFile) formData.append('proof_image', imageFile);
+
+            try {
+                const res = await fetch('', { method: 'POST', body: formData });
+                const data = await res.json();
+
+                if (data.status) {
+                    alertBox.innerHTML = `<div class="alert alert-success py-2 small mt-2">${data.message}</div>`;
+                    setTimeout(() => {
+                        bootstrap.Modal.getInstance(document.getElementById('proofModal')).hide();
+                        loadChat();
+                    }, 800);
+                } else {
+                    alertBox.innerHTML = `<div class="alert alert-danger py-2 small mt-2">${data.message}</div>`;
+                }
+            } catch (err) {
+                alertBox.innerHTML = `<div class="alert alert-danger py-2 small mt-2">An error occurred.</div>`;
+            } finally {
+                btn.disabled = false;
+            }
+        }
+
+        // Initial paint from server-rendered data, then keep both in sync
+        renderConversations(initialConversations);
+        setInterval(refreshConversations, 8000);
+
+        setInterval(loadChat, 3000);
+        loadChat();
+    </script>
 </body>
 </html>

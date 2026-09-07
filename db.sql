@@ -128,6 +128,8 @@ CREATE TABLE IF NOT EXISTS p2p_chats (
     CONSTRAINT fk_chat_sender FOREIGN KEY (sender_uid) REFERENCES users(uid) ON DELETE CASCADE,
     CONSTRAINT fk_chat_receiver FOREIGN KEY (receiver_uid) REFERENCES users(uid) ON DELETE CASCADE
 );
+ALTER TABLE p2p_chats
+ADD COLUMN IF NOT EXISTS seen TINYINT(1) DEFAULT 0 AFTER type;
 
 -- 2. Escrow Transactions Tracking Table
 CREATE TABLE IF NOT EXISTS p2p_escrows (

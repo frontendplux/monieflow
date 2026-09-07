@@ -78,7 +78,7 @@ $selectedCurrency = $_GET['currency'] ?? 'ALL';
 $filter = $_GET['filter'] ?? 'all';
 
 // -----------------------------------------------------------------------------
-// 3. AJAX ENDPOINTS: Create, Edit & Cancel P2P Listing, and Chat Unseen Count
+// 3. AJAX ENDPOINTS: Create, Edit & Cancel P2P Listing
 // -----------------------------------------------------------------------------
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     header('Content-Type: application/json');
@@ -195,24 +195,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         }
         exit();
     }
-
-    // --- GET UNSEEN MESSAGE COUNTS (polled from client via JS) ---
-    if ($action === 'get_unseen_counts') {
-        $countStmt = $conn->prepare("SELECT listing_id, COUNT(*) AS unseen_count FROM p2p_chats WHERE receiver_uid = ? AND seen = 0 GROUP BY listing_id");
-        $countStmt->bind_param("s", $user['uid']);
-        $countStmt->execute();
-        $rows = $countStmt->get_result()->fetch_all(MYSQLI_ASSOC);
-
-        $byListing = [];
-        $total = 0;
-        foreach ($rows as $row) {
-            $byListing[$row['listing_id']] = (int) $row['unseen_count'];
-            $total += (int) $row['unseen_count'];
-        }
-
-        echo json_encode(['status' => true, 'total' => $total, 'by_listing' => $byListing]);
-        exit();
-    }
 }
 
 // -----------------------------------------------------------------------------
@@ -228,24 +210,6 @@ $hasActiveSell = false;
 foreach ($myListings as $ml) {
     if ($ml['type'] === 'buy') $hasActiveBuy = true;
     if ($ml['type'] === 'sell') $hasActiveSell = true;
-}
-
-// -----------------------------------------------------------------------------
-// 4b. Unseen Message Counts (messages sent TO this user, not yet seen)
-//     Counted per listing_id so both "my listings" and marketplace cards
-//     can show how many unread messages are tied to that conversation.
-// -----------------------------------------------------------------------------
-$unseenByListing = [];
-$totalUnseen = 0;
-
-$unseenStmt = $conn->prepare("SELECT listing_id, COUNT(*) AS unseen_count FROM p2p_chats WHERE receiver_uid = ? AND seen = 0 GROUP BY listing_id");
-$unseenStmt->bind_param("s", $user['uid']);
-$unseenStmt->execute();
-$unseenRows = $unseenStmt->get_result()->fetch_all(MYSQLI_ASSOC);
-
-foreach ($unseenRows as $row) {
-    $unseenByListing[(int) $row['listing_id']] = (int) $row['unseen_count'];
-    $totalUnseen += (int) $row['unseen_count'];
 }
 
 // -----------------------------------------------------------------------------
@@ -342,24 +306,6 @@ $listings = $listingsResult->fetch_all(MYSQLI_ASSOC);
 
         .mobile-bottom-nav .nav-link.active { color: var(--brand-skyblue); }
         .mobile-bottom-nav i { font-size: 1.25rem; display: block; margin-bottom: 2px; }
-
-        .unseen-badge {
-            position: absolute;
-            top: -6px;
-            right: -6px;
-            font-size: 0.65rem;
-            min-width: 18px;
-            height: 18px;
-            line-height: 18px;
-            padding: 0 4px;
-            border-radius: 999px;
-        }
-
-        .chat-btn-wrap {
-            position: relative;
-            display: inline-block;
-            width: 100%;
-        }
     </style>
 </head>
 <body>
@@ -372,10 +318,6 @@ $listings = $listingsResult->fetch_all(MYSQLI_ASSOC);
             </a>
 
             <div class="d-flex align-items-center gap-3">
-                <span class="position-relative" id="navUnseenWrap" style="<?= $totalUnseen > 0 ? '' : 'display:none;' ?>">
-                    <i class="bi bi-chat-dots-fill text-primary fs-5"></i>
-                    <span class="badge bg-danger unseen-badge" id="navUnseenBadge"><?= $totalUnseen ?></span>
-                </span>
                 <a href="/member/index.php" class="btn btn-outline-secondary btn-sm rounded-pill px-3">
                     <i class="bi bi-arrow-left me-1"></i> Dashboard
                 </a>
@@ -402,28 +344,16 @@ $listings = $listingsResult->fetch_all(MYSQLI_ASSOC);
                     <h6 class="fw-bold text-primary mb-3"><i class="bi bi-person-badge me-1"></i> Your Active Listings</h6>
                     <div class="row g-3">
                         <?php foreach ($myListings as $my): ?>
-                            <?php $myUnseen = $unseenByListing[(int) $my['id']] ?? 0; ?>
                             <div class="col-12 col-md-6">
                                 <div class="p-3 border rounded-3 bg-light d-flex justify-content-between align-items-center">
                                     <div>
                                         <span class="badge bg-<?= $my['type'] === 'buy' ? 'success' : 'danger' ?> mb-1">
                                             <?= strtoupper($my['type']) ?> OFFER
                                         </span>
-                                        <?php if ($myUnseen > 0): ?>
-                                            <span class="badge bg-danger mb-1" title="Unread messages">
-                                                <i class="bi bi-envelope-fill me-1"></i><?= $myUnseen ?> unread
-                                            </span>
-                                        <?php endif; ?>
                                         <div class="fw-bold small">1 MF = <?= htmlspecialchars($my['currency']) ?> <?= number_format($my['rate'], 2) ?></div>
                                         <div class="text-muted small">Amount: <?= number_format($my['amount'], 2) ?> MF</div>
                                     </div>
                                     <div class="d-flex gap-2">
-                                        <a href="/member/chat.php?listing_id=<?= $my['id'] ?>" class="btn btn-sm btn-outline-primary rounded-circle position-relative" title="Chats">
-                                            <i class="bi bi-chat-dots"></i>
-                                            <?php if ($myUnseen > 0): ?>
-                                                <span class="badge bg-danger unseen-badge"><?= $myUnseen ?></span>
-                                            <?php endif; ?>
-                                        </a>
                                         <button class="btn btn-sm btn-outline-primary rounded-circle" onclick='openEditModal(<?= json_encode($my) ?>)' title="Edit">
                                             <i class="bi bi-pencil"></i>
                                         </button>
@@ -464,7 +394,6 @@ $listings = $listingsResult->fetch_all(MYSQLI_ASSOC);
         <div class="row g-3">
             <?php if (!empty($listings)): ?>
                 <?php foreach ($listings as $item): ?>
-                    <?php $itemUnseen = $unseenByListing[(int) $item['id']] ?? 0; ?>
                     <div class="col-12 col-md-6 col-lg-4">
                         <div class="p2p-card h-100 d-flex flex-column justify-content-between">
                             <div>
@@ -495,14 +424,9 @@ $listings = $listingsResult->fetch_all(MYSQLI_ASSOC);
                                     <i class="bi bi-person-check me-1"></i> Your Listing
                                 </button>
                             <?php else: ?>
-                                <div class="chat-btn-wrap">
-                                    <a href="/member/chat.php?listing_id=<?= $item['id'] ?>" class="btn btn-outline-primary btn-sm w-100 rounded-pill py-2">
-                                        <i class="bi bi-chat-dots me-1"></i> Start Escrow Chat
-                                    </a>
-                                    <?php if ($itemUnseen > 0): ?>
-                                        <span class="badge bg-danger unseen-badge"><?= $itemUnseen ?></span>
-                                    <?php endif; ?>
-                                </div>
+                                <a href="/member/chat.php?listing_id=<?= $item['id'] ?>" class="btn btn-outline-primary btn-sm w-100 rounded-pill py-2">
+                                    <i class="bi bi-chat-dots me-1"></i> Start Escrow Chat
+                                </a>
                             <?php endif; ?>
                         </div>
                     </div>
@@ -767,54 +691,23 @@ $listings = $listingsResult->fetch_all(MYSQLI_ASSOC);
                 alert("An error occurred while deleting the offer.");
             }
         }
-
-        // ---------------------------------------------------------------
-        // Poll unseen message counts so badges update live without a
-        // full page reload while the user browses the marketplace.
-        // ---------------------------------------------------------------
-        async function refreshUnseenCounts() {
-            try {
-                const formData = new FormData();
-                formData.append('action', 'get_unseen_counts');
-
-                const response = await fetch('/member/peer2peer.php', { method: 'POST', body: formData });
-                const result = await response.json();
-                if (!result.status) return;
-
-                // Navbar total badge
-                const navWrap = document.getElementById('navUnseenWrap');
-                const navBadge = document.getElementById('navUnseenBadge');
-                if (result.total > 0) {
-                    navBadge.textContent = result.total;
-                    navWrap.style.display = 'inline-block';
-                } else {
-                    navWrap.style.display = 'none';
-                }
-
-                // Per-listing badges (data-listing-id marks the wrapper elements)
-                document.querySelectorAll('[data-unseen-listing]').forEach(el => {
-                    const listingId = el.getAttribute('data-unseen-listing');
-                    const count = result.by_listing[listingId] || 0;
-                    let badge = el.querySelector('.unseen-badge');
-
-                    if (count > 0) {
-                        if (!badge) {
-                            badge = document.createElement('span');
-                            badge.className = 'badge bg-danger unseen-badge';
-                            el.appendChild(badge);
-                        }
-                        badge.textContent = count;
-                    } else if (badge) {
-                        badge.remove();
-                    }
-                });
-            } catch (err) {
-                // Silently ignore polling errors
-            }
-        }
-
-        setInterval(refreshUnseenCounts, 20000);
     </script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
+make sure to count unseen message from client 
+CREATE TABLE IF NOT EXISTS p2p_chats (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    listing_id INT NOT NULL,
+    sender_uid VARCHAR(36) NOT NULL,
+    receiver_uid VARCHAR(36) NOT NULL,
+    message TEXT DEFAULT NULL,
+    type ENUM('text', 'escrow_init', 'escrow_released', 'system') DEFAULT 'text',
+    payloads JSON DEFAULT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_chat_listing FOREIGN KEY (listing_id) REFERENCES p2p_listings(id) ON DELETE CASCADE,
+    CONSTRAINT fk_chat_sender FOREIGN KEY (sender_uid) REFERENCES users(uid) ON DELETE CASCADE,
+    CONSTRAINT fk_chat_receiver FOREIGN KEY (receiver_uid) REFERENCES users(uid) ON DELETE CASCADE
+);
+ALTER TABLE p2p_chats
+ADD COLUMN IF NOT EXISTS seen tinyint DEFAULT 0;
