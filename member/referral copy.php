@@ -24,65 +24,17 @@ if (!$user) {
     exit();
 }
 
-// 2. Handle Transfer Pending Referral Rewards to Wallet
-$flash_message = null;
-$flash_type = null;
-
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'claim_rewards') {
-    // Begin Transaction to prevent race conditions during balance claims
-    $conn->begin_transaction();
-
-    try {
-        // Calculate total pending rewards
-        $claimStmt = $conn->prepare("SELECT COALESCE(SUM(reward_mf), 0) AS pending_total FROM referrals WHERE referrer_uid = ? AND status = 'pending'");
-        $claimStmt->bind_param("s", $user['uid']);
-        $claimStmt->execute();
-        $pendingAmount = (float)$claimStmt->get_result()->fetch_assoc()['pending_total'];
-
-        if ($pendingAmount > 0) {
-            // 1. Ensure user has a wallet
-            $walletStmt = $conn->prepare("SELECT id FROM wallets WHERE uid = ? FOR UPDATE");
-            $walletStmt->bind_param("s", $user['uid']);
-            $walletStmt->execute();
-            $wallet = $walletStmt->get_result()->fetch_assoc();
-
-            if (!$wallet) {
-                throw new Exception("Wallet account not found. Please initialize your wallet first.");
-            }
-
-            // 2. Credit the wallet balance
-            $updateWallet = $conn->prepare("UPDATE wallets SET balance = balance + ? WHERE uid = ?");
-            $updateWallet->bind_param("ds", $pendingAmount, $user['uid']);
-            $updateWallet->execute();
-
-            // 3. Mark pending referrals as completed
-            $updateRef = $conn->prepare("UPDATE referrals SET status = 'completed' WHERE referrer_uid = ? AND status = 'pending'");
-            $updateRef->bind_param("s", $user['uid']);
-            $updateRef->execute();
-
-            $conn->commit();
-            $flash_message = "Successfully transferred " . number_format($pendingAmount, 2) . " MF to your wallet!";
-            $flash_type = "success";
-        } else {
-            $conn->rollback();
-            $flash_message = "No pending rewards available to claim.";
-            $flash_type = "warning";
-        }
-    } catch (Exception $e) {
-        $conn->rollback();
-        $flash_message = $e->getMessage();
-        $flash_type = "danger";
-    }
-}
-
-// 3. Localization & Multi-Currency Engine
+// 2. Localization & Multi-Currency Engine
+// Base referral reward value internal to system (10 NGN)
 define('BASE_REWARD_NGN', 10.00); 
 
+// Detect client IP address
 $userIp = $_SERVER['HTTP_CLIENT_IP'] ?? $_SERVER['HTTP_X_FORWARDED_FOR'] ?? $_SERVER['REMOTE_ADDR'] ?? '127.0.0.1';
 if (strpos($userIp, ',') !== false) {
     $userIp = trim(explode(',', $userIp)[0]);
 }
 
+// Fetch IP Geolocation data (fallback to USD/NGN if localhost or lookup fails)
 $userCurrency = $user['currency'] ?? 'NGN'; 
 $currencySymbol = '₦';
 
@@ -96,6 +48,7 @@ if ($userIp !== '127.0.0.1' && $userIp !== '::1') {
     }
 }
 
+// Map Currency Symbols
 $currencySymbols = [
     'NGN' => '₦',
     'USD' => '$',
@@ -107,9 +60,14 @@ $currencySymbols = [
 ];
 $currencySymbol = $currencySymbols[$userCurrency] ?? $userCurrency . ' ';
 
+/**
+ * Fetch live exchange rates against NGN
+ * Returns exchange rate: 1 NGN = X Local Currency
+ */
 function getExchangeRateToLocal($targetCurrency) {
     if ($targetCurrency === 'NGN') return 1.0;
 
+    // Cache rate in session to prevent API rate-limiting
     if (isset($_SESSION['exchange_rates'][$targetCurrency])) {
         return $_SESSION['exchange_rates'][$targetCurrency];
     }
@@ -124,38 +82,38 @@ function getExchangeRateToLocal($targetCurrency) {
         }
     }
 
+    // Fallback static conversion safety net
     $fallbacks = ['USD' => 0.00067, 'GBP' => 0.00053, 'EUR' => 0.00062, 'GHS' => 0.010, 'KES' => 0.086];
     return $fallbacks[$targetCurrency] ?? 1.0;
 }
 
 $rateToLocal = getExchangeRateToLocal($userCurrency);
+
+// Calculate 10 NGN equivalent in user's detected local currency
 $userRewardInLocal = BASE_REWARD_NGN * $rateToLocal;
+
+// Convert reward to MF Tokens (Assuming 1 MF Token = 1 Unit of Local Currency or Custom Ratio)
+// E.g., If 1 MF = 1 Local Currency unit:
 $rewardInMF = $userRewardInLocal; 
 
+// Ensure referral code exists
 $refCode = $user['uid'];
 $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? "https" : "http";
 $referralLink = $protocol . "://" . $_SERVER['HTTP_HOST'] . "/register.php?ref=" . urlencode($refCode);
 
-// 4. Fetch Referral Aggregates & Stats
-$statStmt = $conn->prepare("
-    SELECT 
-        COUNT(*) AS total_ref, 
-        COALESCE(SUM(CASE WHEN status = 'completed' THEN reward_mf ELSE 0 END), 0) AS total_claimed,
-        COALESCE(SUM(CASE WHEN status = 'pending' THEN reward_mf ELSE 0 END), 0) AS total_pending
-    FROM referrals 
-    WHERE referrer_uid = ?
-");
+// Fetch Referral Stats
+$statStmt = $conn->prepare("SELECT COUNT(*) AS total_ref, COALESCE(SUM(reward_mf), 0) AS total_earned FROM referrals WHERE referrer_uid = ?");
 $statStmt->bind_param("s", $user['uid']);
 $statStmt->execute();
 $stats = $statStmt->get_result()->fetch_assoc();
 
-// 5. Fetch Complete Referrals List
+// Fetch Recent Referrals List
 $listStmt = $conn->prepare("
     SELECT r.*, u.username, u.email 
     FROM referrals r 
     JOIN users u ON r.referred_uid = u.uid 
     WHERE r.referrer_uid = ? 
-    ORDER BY r.created_at DESC
+    ORDER BY r.created_at DESC LIMIT 10
 ");
 $listStmt->bind_param("s", $user['uid']);
 $listStmt->execute();
@@ -215,6 +173,7 @@ $recentReferrals = $listStmt->get_result()->fetch_all(MYSQLI_ASSOC);
 </head>
 <body>
 
+    <!-- Header / Navbar -->
     <nav class="navbar navbar-expand-lg bg-white border-bottom sticky-top">
         <div class="container">
             <a class="navbar-brand d-flex align-items-center gap-2 fw-bold" href="/member/index.php">
@@ -227,25 +186,21 @@ $recentReferrals = $listStmt->get_result()->fetch_all(MYSQLI_ASSOC);
         </div>
     </nav>
 
+    <!-- Main Content -->
     <main class="container py-4">
 
-        <?php if ($flash_message): ?>
-            <div class="alert alert-<?= $flash_type ?> alert-dismissible fade show mb-4" role="alert">
-                <?= htmlspecialchars($flash_message) ?>
-                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-            </div>
-        <?php endif; ?>
-
+        <!-- Header Title -->
         <div class="mb-4">
             <h1 class="h3 fw-bold mb-1">Refer & Earn MF</h1>
-            <p class="text-muted small">Invite your friends to MonieFlow and transfer earned rewards straight to your wallet balance!</p>
+            <p class="text-muted small">Invite your friends to MonieFlow and earn instant MF rewards on every registration!</p>
         </div>
 
         <!-- Referral Link Banner -->
-        <div class="custom-card mb-4 text-white" style="background: linear-gradient(135deg, #00a8e8 0%, #00719e 100%);">
+        <div class="custom-card mb-4 bg-primary text-white" style="background: linear-gradient(135deg, #00a8e8 0%, #00719e 100%);">
             <div class="row align-items-center g-3">
                 <div class="col-12 col-md-7">
                     <h5 class="fw-bold mb-2"><i class="bi bi-gift me-2"></i>Your Referral Link</h5>
+                    <!-- Hidden internal NGN calculation; displaying local currency + MF value -->
                     <p class="small opacity-90 mb-3">
                         Share this link to claim <strong><?= number_format($rewardInMF, 2) ?> MF</strong> 
                         <span class="opacity-75">(~<?= htmlspecialchars($currencySymbol . number_format($userRewardInLocal, 2)) ?> <?= htmlspecialchars($userCurrency) ?>)</span> 
@@ -263,10 +218,10 @@ $recentReferrals = $listStmt->get_result()->fetch_all(MYSQLI_ASSOC);
             </div>
         </div>
 
-        <!-- Stats & Claim Action Grid -->
+        <!-- Stats Grid -->
         <div class="row g-3 mb-4">
-            <div class="col-12 col-md-4">
-                <div class="custom-card d-flex align-items-center gap-3 h-100">
+            <div class="col-12 col-sm-6">
+                <div class="custom-card d-flex align-items-center gap-3">
                     <div class="stat-icon"><i class="bi bi-people"></i></div>
                     <div>
                         <span class="text-muted small d-block">Total Referrals</span>
@@ -274,45 +229,20 @@ $recentReferrals = $listStmt->get_result()->fetch_all(MYSQLI_ASSOC);
                     </div>
                 </div>
             </div>
-            
-            <div class="col-12 col-md-4">
-                <div class="custom-card d-flex align-items-center gap-3 h-100">
-                    <div class="stat-icon text-warning" style="background: rgba(245, 158, 11, 0.1);"><i class="bi bi-hourglass-split"></i></div>
-                    <div>
-                        <span class="text-muted small d-block">Pending Reward</span>
-                        <h3 class="fw-bold mb-0 text-warning"><?= number_format($stats['total_pending'], 2) ?> MF</h3>
-                    </div>
-                </div>
-            </div>
-
-            <div class="col-12 col-md-4">
-                <div class="custom-card d-flex align-items-center gap-3 h-100">
+            <div class="col-12 col-sm-6">
+                <div class="custom-card d-flex align-items-center gap-3">
                     <div class="stat-icon text-success" style="background: rgba(16, 185, 129, 0.1);"><i class="bi bi-wallet2"></i></div>
                     <div>
-                        <span class="text-muted small d-block">Claimed to Wallet</span>
-                        <h3 class="fw-bold mb-0 text-success"><?= number_format($stats['total_claimed'], 2) ?> MF</h3>
+                        <span class="text-muted small d-block">Total Earned</span>
+                        <h3 class="fw-bold mb-0 text-success"><?= number_format($stats['total_earned'], 2) ?> MF</h3>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- Claim Action Bar -->
-        <div class="custom-card mb-4 d-flex flex-column flex-sm-row justify-content-between align-items-sm-center gap-3">
-            <div>
-                <h6 class="fw-bold mb-1"><i class="bi bi-arrow-right-circle text-primary me-2"></i>Transfer Balance</h6>
-                <p class="text-muted small mb-0">Claim your pending referral bonuses and credit them directly into your wallet.</p>
-            </div>
-            <form method="POST">
-                <input type="hidden" name="action" value="claim_rewards">
-                <button type="submit" class="btn btn-success px-4 fw-semibold rounded-pill w-100 w-sm-auto" <?= ($stats['total_pending'] <= 0) ? 'disabled' : '' ?>>
-                    <i class="bi bi-download me-1"></i> Transfer <?= number_format($stats['total_pending'], 2) ?> MF to Wallet
-                </button>
-            </form>
-        </div>
-
-        <!-- Referred Users History Table -->
+        <!-- Recent Referrals Table -->
         <div class="custom-card">
-            <h6 class="fw-bold mb-3"><i class="bi bi-clock-history me-2 text-primary"></i>Referred Users List</h6>
+            <h6 class="fw-bold mb-3"><i class="bi bi-clock-history me-2 text-primary"></i>Referred Users History</h6>
             <?php if (!empty($recentReferrals)): ?>
                 <div class="table-responsive">
                     <table class="table align-middle mb-0">
@@ -331,17 +261,11 @@ $recentReferrals = $listStmt->get_result()->fetch_all(MYSQLI_ASSOC);
                                         <div class="fw-semibold"><?= htmlspecialchars($ref['username']) ?></div>
                                         <small class="text-muted"><?= htmlspecialchars($ref['email']) ?></small>
                                     </td>
-                                    <td class="fw-bold text-dark">+<?= number_format($ref['reward_mf'], 2) ?> MF</td>
-                                    <td>
-                                        <?php if ($ref['status'] === 'completed'): ?>
-                                            <span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-1">Completed</span>
-                                        <?php else: ?>
-                                            <span class="badge bg-warning-subtle text-warning border border-warning-subtle px-2 py-1">Pending</span>
-                                        <?php ?>
-                                    </td>
+                                    <td class="fw-bold text-success">+<?= number_format($ref['reward_mf'], 2) ?> MF</td>
+                                    <td><span class="badge bg-success-subtle text-success border border-success-subtle">Completed</span></td>
                                     <td class="small text-muted"><?= date('M d, Y', strtotime($ref['created_at'])) ?></td>
                                 </tr>
-                            <?php endif; endforeach; ?>
+                            <?php endforeach; ?>
                         </tbody>
                     </table>
                 </div>
@@ -369,3 +293,27 @@ $recentReferrals = $listStmt->get_result()->fetch_all(MYSQLI_ASSOC);
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
+show list of people refered then a button to transfer to wallet
+then referrals.status will now be completed not pending mean while have change the login referrals.status to pending
+CREATE TABLE IF NOT EXISTS wallets (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    uid VARCHAR(36) NOT NULL UNIQUE,
+    public_id VARCHAR(255) NOT NULL UNIQUE,
+    private_key VARCHAR(255) NOT NULL,
+    account_number VARCHAR(20) NOT NULL UNIQUE,
+    balance DECIMAL(36, 15) DEFAULT 0.00,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    constraint fk_user FOREIGN KEY (uid) REFERENCES users(uid) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS `referrals` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `referrer_uid` VARCHAR(64) NOT NULL,
+  `referred_uid` VARCHAR(64) NOT NULL,
+  `reward_mf` DECIMAL(18, 4) DEFAULT 10.0000,
+  `status` ENUM('pending', 'completed') DEFAULT 'completed',
+  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  INDEX (`referrer_uid`),
+  INDEX (`referred_uid`)
+);
