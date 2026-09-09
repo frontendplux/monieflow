@@ -418,7 +418,7 @@ $listings = $listingsResult->fetch_all(MYSQLI_ASSOC);
                                         <div class="text-muted small">Amount: <?= number_format($my['amount'], 2) ?> MF</div>
                                     </div>
                                     <div class="d-flex gap-2">
-                                        <a href="/member/chat.php?listing_id=<?= $my['id'] ?>" class="btn btn-sm btn-outline-primary rounded-circle position-relative" title="Chats">
+                                        <a href="/member/message.php?listing_id=<?= $my['id'] ?>" class="btn btn-sm btn-outline-primary rounded-circle position-relative" title="Chats">
                                             <i class="bi bi-chat-dots"></i>
                                             <?php if ($myUnseen > 0): ?>
                                                 <span class="badge bg-danger unseen-badge"><?= $myUnseen ?></span>
@@ -496,7 +496,7 @@ $listings = $listingsResult->fetch_all(MYSQLI_ASSOC);
                                 </button>
                             <?php else: ?>
                                 <div class="chat-btn-wrap">
-                                    <a href="/member/chat.php?listing_id=<?= $item['id'] ?>" class="btn btn-outline-primary btn-sm w-100 rounded-pill py-2">
+                                    <a href="/member/message.php?listing_id=<?= $item['id'] ?>" class="btn btn-outline-primary btn-sm w-100 rounded-pill py-2">
                                         <i class="bi bi-chat-dots me-1"></i> Start Escrow Chat
                                     </a>
                                     <?php if ($itemUnseen > 0): ?>
