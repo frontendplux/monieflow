@@ -1063,7 +1063,7 @@ $currentEscrow = $curEStmt->get_result()->fetch_assoc();
                 const badge = c.unseen_count > 0 ? `<span class="convo-unseen">${c.unseen_count}</span>` : '';
                 const label = (c.listing_type === 'buy' ? 'Buying from' : 'Selling to');
 
-                return `<a href="/member/chat.php?listing_id=${c.listing_id}&partner=${encodeURIComponent(c.partner_uid)}" class="convo-item ${activeClass}">
+                return `<a href="/member/message.php?listing_id=${c.listing_id}&partner=${encodeURIComponent(c.partner_uid)}" class="convo-item ${activeClass}">
                             <div class="convo-avatar">${initials(c.partner_full_name || c.partner_username)}</div>
                             <div class="convo-meta">
                                 <div class="d-flex justify-content-between">
